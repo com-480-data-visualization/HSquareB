@@ -4,6 +4,7 @@
 **COM-480 Data Visualization** &nbsp;·&nbsp; Milestone 2 &nbsp;·&nbsp; 1 May 2026
 
 `Live prototype  https://com-480-data-visualization.github.io/HSquareB/`
+
 `Source code     https://github.com/com-480-data-visualization/HSquareB`
 
 ---
@@ -12,9 +13,11 @@
 
 ### 1.1 Thesis
 
-On Sunday 12 May 2024, German solar output was high enough that Switzerland's wholesale electricity price dropped to -€145.12 per MWh at 13:00, below Germany's own price at the same hour. Switzerland has far less solar capacity than Germany. Italy, two interconnectors further south, was still trading at positive prices. Germany's renewable build-out has now reached the point where its weekend solar production sets the clearing price across five central European markets at once.
+On Sunday 12 May 2024, German solar output was high enough that Switzerland's wholesale electricity price dropped to -€145.12 per MWh at 13:00, below Germany's own price at the same hour. This is striking because Switzerland has far less solar capacity than Germany. Whereas, Italy, two interconnectors further south, was still trading at positive prices. 
 
-The goal of the visualisation is to make that price transmission visible, not just describe it in text.
+Later, however, Germany's renewable build-out has reached a point where its weekend solar production sets the clearing price across five central European markets at once.
+
+The goal of the visualisation is to make that cross-border price transmission visible, not just describe it merely in text.
 
 ### 1.2 Motivation
 
