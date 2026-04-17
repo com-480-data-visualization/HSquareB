@@ -1,17 +1,12 @@
 /*
  * The Price of Wind and Sun — stylesheet
- *
- * Design reference: see project design system documentation
- * Typography: Fraunces (variable display serif) + JetBrains Mono
- * Aesthetic direction: "Dispatch from the grid" — editorial gravity meets trading-terminal precision
+ * Typography: Fraunces + JetBrains Mono. See design system.
  */
 
-/* ---------- Synchronized 1Hz heartbeat ----------
- * European AC grids run at 50Hz; humans can't see that, but they CAN
- * feel a 1Hz pulse as a heartbeat. The --beat property is animated as
- * a single source of truth and several elements (the eyebrow dot, the
- * accent mark, the graticule rings) read from it for in-phase glow.
- * Requires @property registration so a number can be transitioned. */
+/* --- 1Hz heartbeat ---
+ * Grid runs at 50Hz; 1Hz reads as a pulse. Single --beat var drives
+ * the eyebrow dot, ampersand, graticule rings in phase.
+ * @property registration lets a number transition. */
 
 @property --beat {
     syntax: "<number>";
@@ -33,10 +28,10 @@
     animation-play-state: paused;
 }
 
-/* ---------- Tokens ---------- */
+/* --- Tokens --- */
 
 :root {
-    /* Backgrounds — deep navy, not pure black, layered */
+    /* Deep navy, never pure black */
     --bg-base: #0a0e1a;
     --bg-surface: #131827;
     --bg-elevated: #1c2235;
@@ -45,26 +40,23 @@
     --border-strong: #3f4659;
     --border-glass: rgba(255, 255, 255, 0.06);
 
-    /* Text — warm whites, muted blue-greys */
     --text-primary: #f5f7fa;
     --text-secondary: #8b95a7;
     --text-muted: #525a6b;
     --text-ghost: #2f3647;
 
-    /* Accent — electric cyan with an ice-white extreme. Reserved for
-     * price-negative encoding + interactive affordances (links, play,
-     * timeline, focus country). */
+    /* Reserved for negative prices + interactive affordances */
     --accent: #22d3ee;
     --accent-bright: #67e8f9;
     --accent-glow: #e0f7ff;
     --accent-dim: #0e7490;
 
-    /* Chrome — desaturated teal for decorative/structural elements
-     * (eyebrow dots, leader lines, compass, kickers, chart titles).
-     * Separated from accent so ornament doesn't compete with data. */
+    /* Desaturated teal for ornament (compass, leader lines, kickers)
+     * so structural chrome doesn't compete with data-encoding accent. */
     --chrome: #3b8ea5;
 
-    /* Price diverging scale — inverted luminance at the extreme */
+    /* Diverging price scale — ice-white at the negative extreme,
+     * per design-system: deeper negatives read as brighter. */
     --price-neg-extreme: #e0f7ff;
     --price-neg-deep: #67e8f9;
     --price-neg: #22d3ee;
@@ -73,7 +65,6 @@
     --price-pos-high: #ef4444;
     --price-pos-extreme: #991b1b;
 
-    /* Generation sources */
     --gen-solar: #fbbf24;
     --gen-wind: #10b981;
     --gen-nuclear: #a855f7;
@@ -82,7 +73,6 @@
     --gen-gas: #fb7185;
     --gen-coal: #64748b;
 
-    /* Motion */
     --ease-default: cubic-bezier(0.22, 0.61, 0.36, 1);
     --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-cinematic: cubic-bezier(0.65, 0, 0.35, 1);
@@ -91,22 +81,20 @@
     --dur-default: 800ms;
     --dur-slow: 1400ms;
 
-    /* Type */
     --font-display: 'Fraunces', 'Iowan Old Style', 'Georgia', serif;
     --font-body: 'Fraunces', 'Iowan Old Style', 'Georgia', serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    /* Layout */
     --content-max: 1440px;
     --narrative-col: 460px;
     --gutter: clamp(24px, 4vw, 80px);
 
-    /* Vignette + film grain — modulated during iris wipe animation */
+    /* Modulated during the iris-wipe animation */
     --vignette-size: 80%;
     --grain-intensity: 0.035;
 }
 
-/* ---------- Reset ---------- */
+/* --- Reset --- */
 
 *,
 *::before,
@@ -114,7 +102,7 @@
     box-sizing: border-box;
 }
 
-/* ---------- Skip link (accessibility) ---------- */
+/* --- Skip link --- */
 
 .skip-link {
     position: absolute;
@@ -233,16 +221,12 @@ a:focus-visible {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "zero", "ss02";
-    /* Reset Fraunces variation settings for the mono face */
+    /* Clear Fraunces axis settings on the mono face */
     font-variation-settings: normal;
 }
 
-/* Negative-price signal — the true Unicode minus (U+2212), rendered
- * in the ice-white glow color so negative numbers visually carry the
- * meaning of the extreme end of the price scale. Use as:
- *   <span class="mono neg">145.12</span>
- *   or with currency: <span class="mono neg">€145.12</span>
- */
+/* True Unicode minus (U+2212) in ice-white, per design spec: negatives
+ * pick up the extreme-end glow of the diverging price scale. */
 .neg::before {
     content: "−";  /* U+2212 */
     color: var(--accent-glow);
@@ -250,8 +234,6 @@ a:focus-visible {
     font-weight: 400;
 }
 
-/* Currency unit rendered as a mono subscript — makes "€145.12/MWh"
- * read as a quantity rather than a string of characters. */
 .unit {
     font-size: 0.62em;
     vertical-align: 0.32em;
@@ -262,8 +244,7 @@ a:focus-visible {
 
 em {
     font-style: italic;
-    /* Fraunces italic at body optical size — display-size contexts
-     * (hero title, cold-open, footer closing) override to opsz 144. */
+    /* Body opsz; display contexts override to opsz 144. */
     font-variation-settings: "opsz" 24, "SOFT" 30;
 }
 
@@ -272,7 +253,7 @@ strong {
     color: var(--text-primary);
 }
 
-/* ---------- Scroll progress bar ---------- */
+/* --- Scroll progress bar --- */
 
 .scroll-progress {
     position: fixed;
@@ -300,8 +281,7 @@ strong {
     transition: width 100ms linear;
 }
 
-/* Chapter ticks. Data-chapter-ticks attribute on the bar container
- * lets narrative.js set `--tick-count` so the notches auto-space. */
+/* narrative.js sets --tick-count; ticks auto-space off it. */
 .scroll-progress__ticks {
     position: absolute;
     inset: 0;
@@ -317,11 +297,7 @@ strong {
     transform: translateY(0);
 }
 
-/* ---------- Big on-map clock ----------
- * Display-sized clock showing the hour of the currently active
- * narrative step, pinned to the lower-right of the viewport. The
- * hour digits are Fraunces italic at display opsz — treated like a
- * typographic moment rather than a utility readout. */
+/* --- Map clock --- */
 
 .map-clock {
     position: fixed;
@@ -378,7 +354,6 @@ strong {
     letter-spacing: -0.04em;
     color: var(--text-primary);
     transition: color var(--dur-default) var(--ease-default);
-    /* Subtle digit morph when the hour changes — a quick blur out + in */
     animation: clockDigitReveal var(--dur-default) var(--ease-cinematic);
 }
 
@@ -399,7 +374,7 @@ strong {
     color: color-mix(in srgb, var(--accent) 55%, var(--text-muted));
     padding: 0 4px;
     transform: translateY(-0.04em);
-    /* Colon blinks softly at the heartbeat rate */
+    /* Blinks with the global heartbeat */
     opacity: calc(0.55 + var(--beat) * 0.45);
 }
 
@@ -437,7 +412,7 @@ strong {
     .map-clock__date { font-size: 8px; }
 }
 
-/* ---------- Hero ---------- */
+/* --- Hero --- */
 
 .hero {
     position: relative;
@@ -451,10 +426,8 @@ strong {
     overflow: hidden;
 }
 
-/* Subtle ambient gradient behind the hero — a light source
- * from lower-left, barely visible, suggests a sunrise without
- * a literal sun. A cursor-following glow layers on top when
- * the .has-cursor-light class is set by JS. */
+/* Ambient low-left light reads as sunrise; cursor-following glow
+ * layers on top when .has-cursor-light is set by JS. */
 .hero {
     --cursor-x: 50%;
     --cursor-y: 50%;
@@ -499,7 +472,6 @@ strong {
     transition: background 200ms linear;
 }
 
-/* Grain overlay on the hero for atmospheric texture. */
 .hero::after {
     content: "";
     position: absolute;
@@ -521,9 +493,8 @@ strong {
     min-height: 100%;
 }
 
-/* Thin warm-gold vertical rule down the left edge of the hero interior.
- * The muted --gen-solar color visually ties to "sun" without being
- * literal. Rises on page load like a curtain pull. */
+/* Warm-gold rule uses --gen-solar so the "sun" of the title echoes
+ * in ornament without being literal. Rises on load like a curtain. */
 .hero__rail {
     position: absolute;
     top: 0;
@@ -548,8 +519,6 @@ strong {
     to { transform: scaleY(1); }
 }
 
-/* Masthead — reads like a newspaper dispatch header. Hairlines between
- * fields, tracked small-caps mono, low-contrast on the warm side. */
 .hero__masthead {
     display: inline-flex;
     align-items: center;
@@ -594,8 +563,7 @@ strong {
     height: 6px;
     border-radius: 50%;
     background: var(--chrome);
-    /* Glow modulates with the global heartbeat. The --beat var is
-     * read from :root and used to compute box-shadow softness. */
+    /* Glow + scale driven by global --beat */
     box-shadow:
         0 0 calc(8px + var(--beat) * 12px) color-mix(in srgb, var(--accent) calc(50% + var(--beat) * 50%), transparent),
         0 0 2px var(--accent-glow);
@@ -606,7 +574,7 @@ strong {
     font-family: var(--font-display);
     font-size: clamp(56px, 9vw, 136px);
     font-weight: 400;
-    /* Fraunces's display-optimised opsz at the largest end */
+    /* Fraunces display opsz */
     font-variation-settings: "opsz" 144, "SOFT" 0;
     letter-spacing: -0.035em;
     line-height: 0.92;
@@ -620,14 +588,10 @@ strong {
     display: block;
 }
 
-/* Per-character reveal — each letter starts invisible, displaced
- * downward, and softly blurred, then lands in sequence. The per-char
- * `animation-delay` is written inline by splitHeroTitleIntoLetters()
- * in main.js so staggering tracks the actual character count.
- *
- * When main.js has NOT yet split the line (reduced-motion, or a race
- * with DOMContentLoaded), the line-level fallback reveal runs on the
- * whole line instead so no content is ever invisible. */
+/* Per-char reveal driven by splitHeroTitleIntoLetters() in main.js;
+ * inline animation-delay per char. Fallback line-level reveal runs
+ * when the line hasn't been split yet (reduced-motion or early paint)
+ * so content is never invisible. */
 .hero__title-line:not(.is-split) {
     opacity: 0;
     transform: translateY(24px);
@@ -660,18 +624,14 @@ strong {
     font-style: italic;
     color: var(--accent-bright);
     font-variation-settings: "opsz" 144, "SOFT" 50;
-    /* Nudge the italic down a hair to optically center it against the
-     * surrounding roman — Fraunces italic rises slightly on the baseline. */
+    /* Fraunces italic rides high on the baseline — nudge down to match roman. */
     display: inline-block;
     transform: translateY(0.015em);
     letter-spacing: -0.01em;
     padding-right: 0.02em;
 }
 
-/* The wonk-italic ampersand. Fraunces has a WONK axis which switches
- * selected glyphs (like &) to swash/calligraphic variants — one of the
- * most beautiful glyphs in any free variable font, almost nobody uses
- * it. Sits slightly below the baseline and is colored accent cyan. */
+/* Fraunces WONK axis swaps & for a swash variant. */
 .hero__amp {
     display: inline-block;
     font-style: italic;
@@ -711,9 +671,7 @@ strong {
     flex-wrap: wrap;
 }
 
-/* Spot-price tape — the trading-floor ticker. A hairline-bounded row
- * of mono country quotes under the byline, reads like a Bloomberg
- * terminal dispatch. Populated from showcase_day.json by main.js. */
+/* Populated from showcase_day.json by main.js. */
 .hero__tape {
     display: flex;
     align-items: center;
@@ -814,7 +772,7 @@ strong {
     transform-origin: left;
 }
 
-/* ---------- Hero animations ---------- */
+/* --- Hero animations --- */
 
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(16px); }
@@ -844,19 +802,13 @@ strong {
     50%      { transform: scaleX(1);   opacity: 1; }
 }
 
-/* ---------- Hero cold-open teaser ----------
- *
- * A single large price briefly flashes after the title has landed,
- * counting the reader from the midnight baseline (~€45) down to the
- * Sunday trough (−€145.12). Overlays the hero without pushing layout.
- * Class toggles (is-showing → is-holding → is-fading) are driven from
+/* --- Hero cold-open ---
+ * State classes (is-showing → is-holding → is-fading) set by
  * setupHeroColdOpen() in main.js. */
 
 .hero__coldopen {
     position: absolute;
-    /* Land in the empty right-hand half of the hero, vertically
-     * aligned with the middle of the title block. The title is
-     * max-width: 14ch on the left, so this zone is clear. */
+    /* Title is max-width 14ch on the left, so the right half is empty. */
     right: clamp(40px, 5vw, 120px);
     top: clamp(180px, 24%, 300px);
     transform: translate(12px, -8px) scale(0.96);
@@ -879,9 +831,7 @@ strong {
 
 
 
-/* On narrow viewports the title wraps wide and there's no room in
- * the right gutter for the counter without crashing into the title.
- * Hide it — the letter-by-letter reveal alone carries the moment. */
+/* Below 1180px the title wraps and the counter collides with it. */
 @media (max-width: 1180px) {
     .hero__coldopen { display: none; }
 }
@@ -923,8 +873,7 @@ strong {
     font-style: normal;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    /* The value tween rewrites the text every frame — min-width keeps
-     * the surrounding geometry from jittering as digits switch. */
+    /* Tween rewrites text every frame; min-width prevents reflow jitter. */
     min-width: 8ch;
     text-align: right;
     display: inline-block;
@@ -969,13 +918,9 @@ strong {
 
 
 
-/* ---------- Scene (shared parent of narrative + explorer) ----------
- *
- * The map is `position: sticky` within this container. It stays
- * pinned as the reader scrolls the narrative cards and the explorer
- * intro, and naturally releases when the scene ends and the footer
- * begins. No JS tricks, no opacity hacks, no fixed-vs-flow conflicts.
- */
+/* --- Scene (shared parent of narrative + explorer) ---
+ * Map is position:sticky inside; natively pins through narrative +
+ * explorer, releases at the footer. */
 
 .scene {
     position: relative;
@@ -987,25 +932,21 @@ strong {
     top: 0;
     height: 100vh;
     height: 100dvh;
-    /* Zero effective height in flow — the narrative and explorer
-     * stack normally on top of the sticky map rather than below it.
-     * This is the canonical "sticky background" trick. */
+    /* Zero effective flow height — the "sticky background" trick
+     * so narrative + explorer stack on top of the map, not below it. */
     margin-bottom: -100vh;
     margin-bottom: -100dvh;
     z-index: 0;
     background: var(--bg-base);
     overflow: hidden;
-    /* Perspective on the sticky container — children tilt with
-     * --map-tilt driven from scroll position. Only the <svg> itself
-     * picks up the rotation; the circadian tint + vignette stay flat
-     * as atmospheric layers, which reads as "ground under sky". */
+    /* Only the <svg> tilts with --map-tilt; tint + vignette stay flat
+     * so they read as sky vs. ground under perspective. */
     perspective: 2400px;
     perspective-origin: 50% 38%;
 }
 
-/* Circadian tint layer — sits above the map SVG. Uses `screen`
- * blend mode so the warm-solar midpoint actually registers against
- * the dark navy base (soft-light at low alpha was imperceptible). */
+/* `screen` blend, not soft-light: at low alpha, soft-light was invisible
+ * against the navy base. */
 .scene__map .circadian {
     position: absolute;
     inset: 0;
@@ -1020,31 +961,22 @@ strong {
     display: block;
     width: 100%;
     height: 100%;
-    /* Desaturate + dim the map when a narrative step is active, so
-     * overlaid prose always out-ranks the background. Reverts to full
-     * saturation for map-focused beats (hero reveal, explorer). */
+    /* Desaturate under active narrative cards so prose dominates.
+     * Reverts for map-focused beats (hero, explorer). */
     filter: saturate(1) brightness(1);
     transition: filter var(--dur-default) var(--ease-default);
-    /* 3D tilt driven by scroll. --map-tilt is written by
-     * setupMapTilt() in main.js; ranges 0 (flat, hero) → 1 (peak
-     * moment, 8°) → holds lower through the explorer. Origin near
-     * center so the top edge doesn't visually jump down as the
-     * tilt increases (at 62% the top-edge displacement was ~24px
-     * at max tilt; at 48% it's ~11px). */
+    /* --map-tilt written by setupMapTilt() in main.js, 0→1 across scroll.
+     * Origin at 48% (not 50%): at 62% the top edge jumped ~24px at max
+     * tilt; 48% cuts that to ~11px. */
     transform: rotateX(calc(var(--map-tilt, 0) * 8deg));
     transform-origin: 50% 48%;
     will-change: transform;
 }
 
-/* When a narrative card lights up its target country, the country
- * physically lifts off the plane — a translateY + scale + double
- * drop-shadow halo reads as "rising" because of the surrounding
- * rotateX tilt. Stroke thickens to an ice-white halo so even small
- * countries (Switzerland, Austria) carry the effect unambiguously.
- *
- * Transition is declared on `.country` above — it runs symmetrically
- * on class add *and* class remove.
- */
+/* Focus country rises off the plane — translateY + scale + double
+ * drop-shadow + thicker ice-white stroke so small countries (CH, AT)
+ * carry the halo unambiguously. Transition lives on `.country` so it
+ * plays symmetrically on add + remove. */
 .country.is-focus-country {
     transform: translateY(-7px) scale(1.03);
     filter:
@@ -1054,9 +986,7 @@ strong {
     stroke-width: 1.6;
 }
 
-/* Secondary highlight — used for comparison countries that share
- * the beat but aren't the card's primary subject. Dimmer contour,
- * no lift, so the primary focus still dominates the hierarchy. */
+/* Dimmer halo, no lift, so the primary focus still dominates. */
 .country.is-secondary-focus {
     stroke: color-mix(in srgb, var(--accent) 65%, transparent);
     stroke-width: 1.3;
@@ -1067,10 +997,7 @@ body.is-narrative-active .scene__map svg {
     filter: saturate(0.55) brightness(0.82);
 }
 
-/* Vignette — subtle radial darken at the edges. Draws the eye
- * to the center where the action happens. The --vignette-size
- * and --grain-intensity variables are modulated during the iris
- * wipe animation that fires once on hero exit. */
+/* --vignette-size + --grain-intensity modulated during the iris wipe. */
 
 .scene__map::before {
     content: "";
@@ -1087,8 +1014,7 @@ body.is-narrative-active .scene__map svg {
     transition: background 1400ms var(--ease-cinematic);
 }
 
-/* Iris wipe — when body.is-iris-firing, vignette contracts sharply
- * and the grain intensifies, mimicking a CRT news-broadcast on-air cue. */
+/* CRT on-air cue: vignette contracts, grain spikes. */
 body.is-iris-firing {
     --vignette-size: 55%;
     --grain-intensity: 0.09;
@@ -1098,9 +1024,7 @@ body.is-iris-firing .scene__map::before {
     transition: background 700ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* Top-of-viewport scrim — a soft fade from the bg color so the HUD
- * never collides with map fill colors. 96px tall, fully transparent
- * at the bottom. Lives above the map but below the HUD. */
+/* Keeps HUD text legible against any map fill colour. */
 .map-topscrim {
     position: fixed;
     top: 0;
@@ -1117,7 +1041,6 @@ body.is-iris-firing .scene__map::before {
     z-index: 80;
 }
 
-/* Grain overlay on the map for atmosphere */
 .scene__map::after {
     content: "";
     position: absolute;
@@ -1130,9 +1053,7 @@ body.is-iris-firing .scene__map::before {
     transition: opacity 700ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* ---------- Map price legend ----------
- * Horizontal gradient bar anchored to the bottom-left of the map.
- * Hidden by default; shown when the map has active price colors. */
+/* --- Map price legend --- */
 
 .map-legend {
     position: absolute;
@@ -1175,7 +1096,7 @@ body.is-iris-firing .scene__map::before {
     margin: 0;
 }
 
-/* ---------- Arrow legend ---------- */
+/* --- Arrow legend --- */
 
 .arrow-legend {
     position: absolute;
@@ -1201,9 +1122,7 @@ body.is-iris-firing .scene__map::before {
     flex-shrink: 0;
 }
 
-/* ---------- Leader-line overlay (card → country) ----------
- * SVG overlay that sits above the map but below the narrative cards.
- * Renders the active card's leader line + target dot. */
+/* --- Leader line (card → country) --- */
 
 .leader-overlay {
     position: fixed;
@@ -1212,8 +1131,7 @@ body.is-iris-firing .scene__map::before {
     height: 100vh;
     height: 100dvh;
     pointer-events: none;
-    /* Above the map (z=0) but below the narrative cards and explorer
-     * so the leader line never paints over the explorer intro. */
+    /* Above map (z=0), below cards + explorer intro. */
     z-index: 2;
     overflow: visible;
 }
@@ -1259,10 +1177,8 @@ body.is-iris-firing .scene__map::before {
     animation: leaderPulse 1800ms var(--ease-default) infinite;
 }
 
-/* When the card the leader is tracking scrolls off-viewport,
- * fade everything out so the line doesn't stretch to chase it.
- * !important beats .is-visible so we don't have to remove that
- * class (which would break the show/hide lifecycle). */
+/* !important wins over .is-visible so we keep the show/hide lifecycle
+ * intact while still force-hiding when the card scrolls off. */
 .leader-line.is-offscreen,
 .leader-target.is-offscreen,
 .leader-target-pulse.is-offscreen {
@@ -1275,14 +1191,7 @@ body.is-iris-firing .scene__map::before {
     100% { opacity: 0; r: 22; }
 }
 
-/* ---------- Map — graticule (cartographic atlas touch) ---------- */
-
-/*
- * Thin meridian/parallel lines + concentric distance rings from the
- * map's anchor point (Munich). Half-opacity grey so they sit behind
- * the countries without ever competing for attention. Reads as both
- * "serious atlas" and "radar sweep / grid schematic".
- */
+/* --- Map graticule --- */
 
 .graticule__line {
     fill: none;
@@ -1308,15 +1217,9 @@ body.is-iris-firing .scene__map::before {
     stroke-linecap: round;
 }
 
-/* ---------- Map — cartouche (compass rose, scale bar, edge labels) ----------
- *
- * Classic atlas furniture rendered inside the map SVG so it tilts with
- * the 3D perspective and reads as part of the geography, not as chrome.
- * Thin warm-gold strokes (via --gen-solar) tie the cartouche to the
- * hero's warm-gold vertical rule — one subtle through-line across the
- * piece. The north needle is the only piece in accent cyan so it carries
- * the only color in the corner.
- */
+/* --- Map cartouche (compass, scale bar, edge labels) ---
+ * Inside the SVG so it tilts with the map. Warm-gold strokes
+ * via --gen-solar mirror the hero rail. */
 
 .cartouche {
     pointer-events: none;
@@ -1415,22 +1318,14 @@ body.is-iris-firing .scene__map::before {
 }
 
 @media (max-width: 900px) {
-    /* Cartouche clutter hurts the smaller viewport — hide it on mobile. */
     .cartouche { display: none; }
 }
 
-/* ---------- Map — countries (base state) ----------
- *
- * Every animated property lives here on the base rule (not on the
- * focus modifier below), so that when the `is-focus-country` class
- * is *removed* the same transition plays in reverse. Otherwise the
- * country snaps back to its resting state the instant focus leaves.
- *
- * transform-box / transform-origin let the focus scale + translate
- * pivot around each path's own bounding-box centre, rather than the
- * SVG coordinate origin at (0, 0). Without these, scaling a country
- * would also translate it by most of its distance from origin.
- */
+/* --- Map countries ---
+ * Transitions live on the base rule (not the focus modifier) so
+ * removing is-focus-country plays the reverse; otherwise it snaps back.
+ * transform-box: fill-box makes scale pivot around each path's own
+ * bbox centre instead of the SVG origin. */
 .country {
     fill: var(--bg-surface);
     stroke: var(--border-strong);
@@ -1438,8 +1333,7 @@ body.is-iris-firing .scene__map::before {
     stroke-linejoin: round;
     transform-box: fill-box;
     transform-origin: center;
-    /* All animated properties share the same curve so fill, stroke,
-     * and glow arrive together as one beat. */
+    /* Shared curve so fill/stroke/glow arrive as one beat */
     transition:
         fill var(--dur-default) var(--ease-default),
         transform var(--dur-default) var(--ease-default),
@@ -1463,14 +1357,13 @@ body.is-iris-firing .scene__map::before {
     cursor: pointer;
 }
 
-/* Keyboard focus uses the same halo as hover instead of the global
- * outline rule — outline rendering on SVG paths is inconsistent across
- * browsers, and the stroke/filter pair matches the hover affordance. */
+/* SVG outline rendering is inconsistent across browsers, so we suppress
+ * the global outline and reuse the hover halo for keyboard focus. */
 .country:focus-visible {
     outline: none;
 }
 
-/* ---------- Map — country hover tooltip ---------- */
+/* --- Country hover tooltip --- */
 
 .map-tip {
     position: absolute;
@@ -1486,18 +1379,9 @@ body.is-iris-firing .scene__map::before {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-/* ---------- Map — flow guides + particle stream ----------
- *
- * Quadratic bezier paths connecting country centroids, rendered when
- * the price spread between two connected markets exceeds a threshold.
- * Direction follows the price gradient (low → high).
- *
- * The path itself is now a dim CHANNEL — a low-opacity cyan hairline
- * that shows the route of the interconnector even when no particle is
- * currently on it. The motion layer is a generative stream of small
- * dots (`.particle`) that ride the same path, spawned and advanced by
- * map.js. Focus-country flows glow brighter and flow faster.
- */
+/* --- Flow channels + particle stream ---
+ * Path is a dim channel (interconnector route); particles spawned
+ * and advanced by map.js. Direction follows price gradient low→high. */
 
 .flow {
     stroke: color-mix(in srgb, var(--accent) 70%, transparent);
@@ -1511,10 +1395,8 @@ body.is-iris-firing .scene__map::before {
             drop-shadow(0 0 2px var(--accent-glow));
 }
 
-/* Particles — small cyan dots streaming along the flow guide. JS owns
- * their transform (via translate) + opacity on every rAF tick; the
- * group-level `#particle-glow` SVG filter in map.js handles the glow
- * for all particles at once so individual nodes stay cheap. */
+/* JS owns transform + opacity per rAF tick; group filter #particle-glow
+ * in map.js handles the halo so individual nodes stay cheap. */
 .particle {
     fill: var(--accent);
     pointer-events: none;
@@ -1524,18 +1406,9 @@ body.is-iris-firing .scene__map::before {
     fill: var(--accent-glow);
 }
 
-/* ---------- Map — labels (ISO code + live price per country) ----------
- *
- * Two text elements per country, grouped:
- *   .label__code   — two-letter ISO code, small tracked mono uppercase
- *   .label__price  — current price at the active hour, mono tabular
- *
- * Default state: invisible (countries don't have labels until a
- * narrative step activates the map).
- * is-visible: labels fade in with the step.
- * is-focus: labels of the card's target country get the hero treatment —
- *   larger, ice-white, with a glow filter.
- */
+/* --- Country labels (ISO code + live price) ---
+ * Invisible by default; .is-visible fades in with the step,
+ * .is-focus enlarges to ice-white for the card's target country. */
 
 .label {
     pointer-events: none;
@@ -1555,7 +1428,7 @@ body.is-iris-firing .scene__map::before {
     letter-spacing: 0.18em;
     text-transform: uppercase;
     fill: color-mix(in srgb, var(--text-primary) 60%, transparent);
-    /* Tight dark stroke for legibility against any country fill color */
+    /* Dark halo so codes stay legible over any country fill */
     paint-order: stroke;
     stroke: var(--bg-base);
     stroke-width: 3.5;
@@ -1578,7 +1451,6 @@ body.is-iris-firing .scene__map::before {
         fill var(--dur-default) var(--ease-default);
 }
 
-/* Focus country — the card's target. Label grows and glows. */
 .label.is-focus .label__code {
     fill: var(--accent-glow);
 }
@@ -1591,14 +1463,10 @@ body.is-iris-firing .scene__map::before {
             drop-shadow(0 0 2px var(--accent-glow));
 }
 
-/* ---------- Narrative column ----------
- *
- * The bottom padding is intentionally short (40vh instead of 100vh)
- * so the emotional peak of Step 3 — the −145.12 hero number — flows
- * into the explorer intro quickly. Agent E's insight: the reader's
- * emotional momentum from the reveal shouldn't be spent on empty
- * scroll. The scrubber is the reveal's proof; don't make them wait.
- */
+/* --- Narrative column ---
+ * padding-block bottom is 40vh (not 100vh) so the Step 3 reveal
+ * flows straight into the explorer while the reader's momentum
+ * is still on the number. */
 
 .scene__narrative {
     position: relative;
@@ -1612,11 +1480,8 @@ body.is-iris-firing .scene__map::before {
     gap: 70vh;
 }
 
-/* Glass narrative card. A floating dispatch.
- *
- * Asymmetric top border: a brighter 1px line on top fakes a light
- * source from above. This is the single rule that separates "glass
- * card" from "PowerPoint box". */
+/* Asymmetric top border fakes a light source from above — the single
+ * rule separating glass card from PowerPoint box. */
 .step {
     pointer-events: auto;
     position: relative;
@@ -1633,8 +1498,7 @@ body.is-iris-firing .scene__map::before {
         0 4px 12px -2px rgba(0, 0, 0, 0.3),
         0 1px 0 0 rgba(255, 255, 255, 0.05) inset;
 
-    /* Inactive state — dimmed but still readable so the reader can
-     * glance back at a previous card. Active card jumps to 1. */
+    /* Dimmed but still readable — reader can glance back. */
     opacity: 0.65;
     transform: translateY(16px) scale(0.985);
     transition:
@@ -1649,7 +1513,7 @@ body.is-iris-firing .scene__map::before {
     -webkit-backdrop-filter: none;
 }
 
-/* Radial scrim under the active card only — guarantees legibility
+/* Radial scrim under the active card only, so prose stays readable
  * without dimming the whole map. */
 .step::after {
     content: "";
@@ -1673,8 +1537,7 @@ body.is-iris-firing .scene__map::before {
 .step.is-active {
     opacity: 1;
     transform: translateY(0) scale(1);
-    /* Override the 600ms delay on the inactive rule — the entering
-     * card should brighten immediately, only the LEAVING card dwells. */
+    /* Entering card brightens immediately; leaving card keeps the 600ms dwell. */
     transition-delay: 0ms;
     border-color: color-mix(in srgb, var(--step-accent, var(--accent)) 18%, var(--border-glass));
     border-top-color: color-mix(in srgb, var(--step-accent, var(--accent)) 24%, rgba(255, 255, 255, 0.12));
@@ -1685,16 +1548,14 @@ body.is-iris-firing .scene__map::before {
         0 1px 0 0 rgba(255, 255, 255, 0.1) inset;
 }
 
-/* Per-step semantic accent. Each step's active state uses a slightly
- * different hue tied to the temperature of the moment. The whole bar,
- * border, eyebrow, and step number react together. */
+/* Per-step accent hue — bar, border, eyebrow and number react as one. */
 .step[data-step="1"] { --step-accent: var(--accent-dim); }
 .step[data-step="2"] { --step-accent: var(--accent); }
 .step[data-step="3"] { --step-accent: var(--accent-glow); }
 
 .step[data-step="3"].is-active {
-    /* Step 3 — the shock. Adds an interior cyan wash because this is
-     * the moment the data breaks the rule. */
+    /* Step 3 (the shock) adds an interior cyan wash — data breaks the
+     * rule, so the layout breaks the rule too. */
     box-shadow:
         0 40px 80px -20px rgba(0, 0, 0, 0.85),
         0 4px 16px -2px rgba(0, 0, 0, 0.4),
@@ -1703,23 +1564,13 @@ body.is-iris-firing .scene__map::before {
         inset 0 0 80px color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
-/* ---------- Step 3 — break the grid (number-as-hero) ---------- */
-
-/*
- * After two cards in a steady rhythm, Step 3 ruptures the layout: the
- * card widens, and the price value becomes the centerpiece in display
- * Fraunces italic. The body prose flows under the number like a cutline.
- *
- * This is intentional craft — the data breaks the rule (prices going
- * negative is nonsense), so the layout breaks the rule too.
- */
+/* --- Step 3: number-as-hero --- */
 
 .step--shock {
     max-width: 540px;
 }
 
-/* Steps 4–5 match the shock card width so the progression
- * from 460→540→540 reads as intentional widening, not a regression. */
+/* Same width as shock so the progression 460→540→540 reads as intentional. */
 .step--wide {
     max-width: 540px;
 }
@@ -1747,7 +1598,6 @@ body.is-iris-firing .scene__map::before {
         0 0 60px color-mix(in srgb, var(--accent) 40%, transparent),
         0 0 24px color-mix(in srgb, var(--accent-bright) 30%, transparent);
 
-    /* Hidden by default; revealed when the card activates */
     opacity: 0;
     transform: translateY(20px) scale(0.96);
     filter: blur(8px);
@@ -1789,7 +1639,7 @@ body.is-iris-firing .scene__map::before {
     font-variation-settings: "opsz" 144, "SOFT" 50, "wght" 300;
     letter-spacing: -0.04em;
     color: var(--accent-glow);
-    /* Reset mono utility settings — we want the display serif here */
+    /* Clear mono settings — display serif here */
     font-variant-numeric: normal;
     font-feature-settings: normal;
 }
@@ -1816,8 +1666,6 @@ body.is-iris-firing .scene__map::before {
     padding-top: 4px;
 }
 
-/* Left accent bar that grows when the step activates. Uses the
- * step-specific accent hue. */
 .step::before {
     content: "";
     position: absolute;
@@ -1898,12 +1746,12 @@ body.is-iris-firing .scene__map::before {
 }
 
 .step__body strong.mono {
-    /* Mono strongs are the data highlights — pulled out further. */
+    /* Mono strongs = data highlights, pulled out further */
     color: var(--accent-bright);
     font-weight: 500;
 }
 
-/* ---------- Step sparkline (in-card 24h price trace) ---------- */
+/* --- Step sparkline --- */
 
 .step__chart {
     margin-top: 24px;
@@ -1991,8 +1839,6 @@ body.is-iris-firing .scene__map::before {
     font-weight: 600;
 }
 
-/* Generation donut — small pie chart showing source mix at a
- * specific hour. Sits inside the step chart container. */
 .gen-donut__label {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -2002,13 +1848,7 @@ body.is-iris-firing .scene__map::before {
     font-variation-settings: normal;
 }
 
-/* ---------- Calendar heatmap ----------
- *
- * A dense hour × day grid rendered to <canvas> and wrapped in a thin
- * DOM structure for axis labels and tooltip. Sits inside a narrative
- * step card's .step__chart container. Two instances stack vertically
- * (DE above, CH below) when Step 4 is active.
- */
+/* --- Calendar heatmap --- */
 
 .cal-heatmap {
     display: inline-block;
@@ -2024,7 +1864,6 @@ body.is-iris-firing .scene__map::before {
     text-align: center;
 }
 
-/* DE / CH toggle tabs above the heatmap grid. */
 .cal-heatmap__tabs {
     display: inline-flex;
     gap: 2px;
@@ -2154,12 +1993,7 @@ body.is-iris-firing .scene__map::before {
     letter-spacing: 0.05em;
 }
 
-/* ---------- Generation stack chart ----------
- *
- * Stacked area of hourly generation by source for Germany on the
- * showcase day, with a price line on a secondary right-hand axis
- * and a dashed total-load reference line.
- */
+/* --- Generation stack --- */
 
 .gen-stack {
     display: inline-block;
@@ -2270,7 +2104,7 @@ body.is-iris-firing .scene__map::before {
     line-height: 1.5;
 }
 
-/* ---------- Daily profile chart ---------- */
+/* --- Daily profile --- */
 
 .daily-profile {
     display: inline-block;
@@ -2319,8 +2153,7 @@ body.is-iris-firing .scene__map::before {
     filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 40%, transparent));
 }
 
-/* Duck chart (Step 6) gets heavier lines so the monthly morph is
- * clearly visible against the glass card background. */
+/* Heavier lines — monthly morph has to read against the glass card. */
 .step__chart--duck .daily-profile__line {
     stroke-width: 2.6;
     filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 55%, transparent));
@@ -2361,7 +2194,7 @@ body.is-iris-firing .scene__map::before {
     font-variation-settings: normal;
 }
 
-/* Compact mode — small multiples for Step 7 */
+/* Step 7 small-multiples variant */
 .daily-profile--compact {
     margin-bottom: 8px;
 }
@@ -2375,7 +2208,6 @@ body.is-iris-firing .scene__map::before {
     fill: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-/* Small multiples grid for Step 7 */
 .small-multiples {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2428,33 +2260,11 @@ body.is-iris-firing .scene__map::before {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-/* ---------- Explorer ----------
- *
- * A "steer the grid" mode. The map stays FULLY visible in the fixed
- * background — the explorer section is completely transparent so the
- * reader can see the countries and flow arrows they're about to
- * drive. Intro copy and the timeline card float over the map as
- * semantic glass panels with their own backdrop blur; the section
- * itself adds nothing between them and the map.
- */
-
-/* ---------- Explorer (inside the scene) ----------
- *
- * The explorer is a 100vh section that sits below the narrative
- * inside the same `.scene` container as the sticky map. Structure:
- *
- *   .scene__explorer    — 100vh relative-positioned section
- *   .explorer__intro    — normal flow, rides the top of the section
- *   .explorer__timeline-wrap — position:sticky bottom, docks to
- *                              viewport bottom while the section is
- *                              scrolling through the viewport
- *
- * When the reader enters the explorer, the intro enters naturally
- * and the sticky timeline docks. They both ride together with the
- * rest of the document. When the section ends, the timeline un-docks
- * and the scene ends — the sticky map slides away and the footer
- * takes over. No fade JS, no position:fixed fights.
- */
+/* --- Explorer ---
+ * 100dvh section inside .scene (sticky map visible underneath).
+ * .explorer__intro flows at the top; .explorer__timeline-wrap is
+ * itself position:sticky so it docks to the viewport bottom and
+ * naturally un-docks when the section ends. */
 
 .scene__explorer,
 .explorer {
@@ -2471,30 +2281,21 @@ body.is-iris-firing .scene__map::before {
 .explorer__intro {
     padding: 10vh var(--gutter) 0;
     max-width: calc(520px + var(--gutter) * 2);
-    /* Legibility on bare map — tight dark halo under the text. */
+    /* Dark halo — intro sits over the bare map */
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7),
                  0 0 12px rgba(10, 14, 26, 0.9);
 }
 
-/* Timeline wrap — sticky to the explorer section's bottom edge.
- * When the reader scrolls the explorer into view, this docks to the
- * viewport bottom. When the explorer ends, it naturally un-docks
- * and the footer rises. No JS fade, no fixed-position fight — the
- * browser does the work via native sticky positioning.
- *
- * `margin-top: auto` pushes the wrap to the bottom of the explorer's
- * flex column, so the bottom of the wrap is at the bottom of the
- * section. `bottom: clamp(...)` applies the sticky offset. */
+/* margin-top:auto pushes wrap to flex-column bottom; sticky bottom
+ * offset docks it to the viewport while the section is in view. */
 .explorer__timeline-wrap {
     position: sticky;
     bottom: calc(clamp(24px, 4vh, 56px) + env(safe-area-inset-bottom, 0px));
     margin-top: auto;
     padding: 0 max(var(--gutter), env(safe-area-inset-right, 0px)) 0 max(var(--gutter), env(safe-area-inset-left, 0px));
     z-index: 6;
-    /* Fades in synced with the explorer headline becoming visible.
-     * Default state is invisible; the .is-visible class is toggled
-     * by an IntersectionObserver in explorer.js watching the
-     * .explorer__headline element. */
+    /* .is-visible toggled by IntersectionObserver in explorer.js
+     * watching the .explorer__headline element. */
     opacity: 0;
     transform: translateY(20px);
     transition: opacity var(--dur-default) var(--ease-cinematic),
@@ -2563,9 +2364,6 @@ body.is-iris-firing .scene__map::before {
     margin: 0;
 }
 
-/* Inline "try this" cue — an editorial callout in the intro that
- * gives the reader a specific destination worth scrubbing to, so
- * the timeline becomes an invitation rather than just an affordance. */
 .explorer__cue {
     display: flex;
     align-items: baseline;
@@ -2599,16 +2397,12 @@ body.is-iris-firing .scene__map::before {
     font-size: 15px;
     font-weight: 700;
     opacity: 0.85;
-    /* Subtle breathing pulse to draw the eye, tied to the global
-     * 1Hz heartbeat so it feels of-a-piece rather than arbitrary. */
+    /* Breathes on the global 1Hz heartbeat */
     transform: translateX(calc(var(--beat) * 3px));
     transition: transform 200ms var(--ease-default);
 }
 
-/* Scroll-pause prompt — visible during the brief scroll freeze
- * when the explorer first enters. Encourages the reader to interact
- * with the timeline. Fades out when the pause releases (auto-timer
- * or first interaction). */
+/* Shown during the brief scroll freeze on explorer entry. */
 .explorer__scroll-prompt {
     display: flex;
     align-items: center;
@@ -2636,23 +2430,16 @@ body.is-iris-firing .scene__map::before {
     50%      { transform: translateY(4px); }
 }
 
-/* Show prompt during the scroll pause */
 .scene__explorer.is-scroll-locked .explorer__scroll-prompt {
     opacity: 1;
     transform: translateY(0);
 }
 
-/* Fade prompt out on release */
 .scene__explorer.is-scroll-released .explorer__scroll-prompt {
     opacity: 0;
 }
 
-/* ---------- Explorer sidebar ----------
- *
- * Slides in from the right when the reader clicks a country on the
- * map during the explorer phase. Shows generation stack + daily
- * profile + stats for the selected country at the current hour.
- */
+/* --- Explorer sidebar --- */
 
 .explorer__sidebar {
     position: fixed;
@@ -2765,7 +2552,7 @@ body.is-iris-firing .scene__map::before {
     }
 }
 
-/* ---------- Timeline scrubber ---------- */
+/* --- Timeline scrubber --- */
 
 .timeline {
     background: var(--bg-glass);
@@ -2823,9 +2610,7 @@ body.is-iris-firing .scene__map::before {
     transform: scale(0.96);
 }
 
-/* Waiting for the first click — the play button radiates a slow
- * accent pulse so the reader can't miss it. Class is applied by
- * explorer.js on entry and removed the moment they interact. */
+/* is-waiting set by explorer.js on entry, cleared on first interaction. */
 .timeline.is-waiting .timeline__play {
     animation: playWait 1900ms var(--ease-cinematic) infinite;
     background: color-mix(in srgb, var(--accent) 18%, var(--bg-elevated));
@@ -3003,18 +2788,14 @@ body.is-iris-firing .scene__map::before {
     height: 36px;
     cursor: grab;
     user-select: none;
-    /* `pan-y` lets the browser handle vertical scroll natively while
-     * we take horizontal pan events for drag-scrubbing. Using `none`
-     * would swallow all touch gestures and block page scroll whenever
-     * a finger touched the track. */
+    /* pan-y preserves vertical page scroll while we capture horizontal
+     * pans for drag-scrubbing; `none` would block page scroll on touch. */
     touch-action: pan-y;
     outline: none;
 }
 
-/* Suppress the global 2px focus ring on the track — it would draw
- * a giant cyan box around the full-width track container. The handle
- * ring scaling up on focus is the correct affordance: it shows the
- * keyboard user where their arrow keys will act. */
+/* Global focus ring would draw a full-width cyan box around the track.
+ * The handle ring scaling up on focus is the correct affordance. */
 .timeline__track:focus-visible {
     outline: none;
 }
@@ -3122,11 +2903,8 @@ body.is-iris-firing .scene__map::before {
     box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-/* First-encounter pulse — a subtle "you can drag me" hint that
- * fires when the explorer first comes into view. Pulses the handle
- * ring outward three times then stops. The timeline's
- * is-touched class (set on first user interaction) kills the
- * animation permanently so it never fires again. */
+/* First-encounter drag hint — three pulses then stops.
+ * is-touched (set on first interaction) kills the animation. */
 .timeline.is-hinting .timeline__handle-ring {
     opacity: 1;
     animation: timelineHint 1800ms cubic-bezier(0.22, 0.61, 0.36, 1) 3;
@@ -3173,9 +2951,6 @@ body.is-iris-firing .scene__map::before {
 }
 
 @media (max-width: 900px) {
-    /* Tighten explorer intro padding + rework the cue to be more
-     * compact on narrow screens. The sticky timeline stays at the
-     * viewport bottom and the intro rides above it. */
     .scene__explorer,
     .explorer {
         padding: 0;
@@ -3212,7 +2987,7 @@ body.is-iris-firing .scene__map::before {
     }
 }
 
-/* ---------- Footer ---------- */
+/* --- Footer --- */
 
 .site-footer {
     position: relative;
@@ -3227,10 +3002,8 @@ body.is-iris-firing .scene__map::before {
     min-height: 64vh;
 }
 
-/* No footer top-mask — under the sticky-scene architecture the map
- * naturally scrolls out of the viewport as the scene ends, so the
- * footer arrives cleanly through empty space. A soft mask here would
- * add visual noise to a transition that no longer needs softening. */
+/* No footer top-mask: the sticky map scrolls cleanly out of view,
+ * so a fade here would only add noise. */
 
 .site-footer__inner {
     max-width: var(--content-max);
@@ -3330,7 +3103,7 @@ body.is-iris-firing .scene__map::before {
     margin: 0;
 }
 
-/* Footer scroll-triggered reveal — staggered entrance */
+/* Staggered scroll-triggered reveal */
 .site-footer__kicker,
 .site-footer__closing,
 .site-footer__columns,
@@ -3380,7 +3153,7 @@ body.is-iris-firing .scene__map::before {
     }
 }
 
-/* ---------- Responsive ---------- */
+/* --- Responsive --- */
 
 @media (max-width: 900px) {
     :root {
@@ -3405,7 +3178,7 @@ body.is-iris-firing .scene__map::before {
         font-size: 26px;
     }
 
-    /* Tap targets ≥ 44px for touch devices */
+    /* 44px minimum for touch targets */
     .timeline__track { height: 56px; }
     .sidebar__close { width: 44px; height: 44px; padding: 10px; }
     .timeline__mode-btn, .timeline__speed-btn {
@@ -3470,12 +3243,9 @@ body.is-iris-firing .scene__map::before {
     button:focus-visible { outline: none; }
 }
 
-/* ---------- Wide viewport / zoomed-out scaling ----------
- *
- * At browser zoom < 100% or on ultrawide monitors (>1800px effective
- * viewport), fixed-px text becomes microscopic and the layout floats
- * in too much empty space. Scale up the base font, layout tokens, and
- * small UI text proportionally. */
+/* --- Wide viewport / zoom-out scaling ---
+ * Ultrawide or zoomed-out views make fixed-px text microscopic;
+ * scale base font, layout tokens and small UI text proportionally. */
 
 @media (min-width: 1800px) {
     :root {
@@ -3486,7 +3256,7 @@ body.is-iris-firing .scene__map::before {
 
     body { font-size: 19px; }
 
-    /* Small mono UI text — floor at 11px so nothing is microscopic */
+    /* Floor small mono text at 11px */
     .map-clock__label, .map-clock__date,
     .hero__masthead-item, .hero__tape-label, .hero__tape-quote,
     .hero__byline, .hero__date, .hero__scroll-hint,

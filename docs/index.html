@@ -39,11 +39,7 @@
     </div>
     <div class="map-topscrim" aria-hidden="true"></div>
 
-    <!--
-        Big on-map clock. Sits in the lower-right of the viewport and
-        shows the hour of the active narrative step at display size.
-        Fades in on first step enter, fades out when no step is active.
-    -->
+    <!-- Populated from the active narrative step's data-hour. -->
     <div class="map-clock" aria-hidden="true" data-map-clock>
         <p class="map-clock__label mono">Central European Time</p>
         <div class="map-clock__time">
@@ -84,12 +80,7 @@
                 <div class="hero__byline mono">Brian Banna · Lê Thào Huyèn · Hajj Hannah</div>
                 <div class="hero__date mono">HSquareB</div>
             </div>
-            <!--
-                Spot-price tape — a live-looking trading-floor ticker under
-                the byline. Values are populated from showcase_day.json and
-                cycled through four hours of the day to sell "these prices
-                move" before the first chart loads.
-            -->
+            <!-- Values populated from showcase_day.json, cycled by main.js. -->
             <div class="hero__tape" aria-hidden="true" data-hero-tape>
                 <span class="hero__tape-label mono">Spot <span class="hero__tape-sep">·</span> <span data-tape-timestamp>2024-05-12 · 00:00 CET</span></span>
                 <span class="hero__tape-row">
@@ -105,12 +96,7 @@
                 <span class="hero__scroll-rule"></span>
             </p>
 
-            <!--
-                Cold-open teaser — a single large price briefly flashes
-                after the title has landed, counting down from the
-                midnight baseline to the Sunday trough. Populated and
-                animated by setupHeroColdOpen() in main.js.
-            -->
+            <!-- Animated by setupHeroColdOpen() in main.js. -->
             <div class="hero__coldopen" data-hero-coldopen aria-hidden="true">
                 <span class="hero__coldopen-eyebrow mono">13:00 CET · 12 May 2024 · Switzerland</span>
                 <div class="hero__coldopen-number">
@@ -122,28 +108,18 @@
         </div>
     </header>
 
-    <!--
-        Scene — the shared parent container of the narrative + explorer.
-        The map is `position: sticky` within the scene, so it stays
-        pinned as the reader scrolls through the narrative AND the
-        explorer, then naturally releases when the scene ends and the
-        footer begins. This is the single architectural insight that
-        replaces all the old fade-based workarounds.
-    -->
+    <!-- Shared parent of narrative + explorer; map is position:sticky inside. -->
     <div class="scene">
         <aside class="scene__map" id="map-container" aria-label="Map of central European electricity prices">
-            <!-- Map canvas. Populated by js/map.js. -->
+            <!-- Populated by js/map.js. -->
             <div class="circadian" aria-hidden="true"></div>
 
-            <!-- Price color legend — gradient bar + tick labels. Hidden
-                 until the map has active price colors (hour != null). -->
             <div class="map-legend" aria-label="Price colour scale">
                 <canvas class="map-legend__bar" width="200" height="12"></canvas>
                 <div class="map-legend__ticks mono"></div>
                 <p class="map-legend__caption mono">EUR / MWh</p>
             </div>
 
-            <!-- Arrow legend — explains flow direction. -->
             <div class="arrow-legend mono" aria-label="Flow arrow legend">
                 <svg width="32" height="10" viewBox="0 0 32 10" aria-hidden="true">
                     <defs><marker id="arrow-legend-head" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="var(--accent)"/></marker></defs>
@@ -153,8 +129,7 @@
             </div>
         </aside>
 
-        <!-- Leader-line overlay — sits above the map, below the cards.
-             Populated by js/narrative.js when a step activates. -->
+        <!-- Sits above map, below cards. Populated by js/narrative.js. -->
         <svg class="leader-overlay" id="leader-overlay" aria-hidden="true"></svg>
 
         <main class="scene__narrative" id="narrative">
@@ -252,13 +227,7 @@
             </article>
         </main>
 
-        <!--
-            Explorer — lives INSIDE the same scene as the narrative so
-            the sticky map stays in place as the reader enters it. The
-            timeline is itself `position: sticky; bottom: 32px` so it
-            docks to the viewport while the reader is in the explorer,
-            and naturally un-docks when the explorer ends.
-        -->
+        <!-- Inside the scene so the sticky map persists; timeline is itself sticky. -->
         <section class="scene__explorer" id="explorer" aria-label="Interactive explorer">
             <div class="explorer__intro">
                 <p class="explorer__eyebrow mono"><span class="explorer__eyebrow-dot" aria-hidden="true"></span>Now you steer the grid</p>
