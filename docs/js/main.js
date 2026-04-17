@@ -3,14 +3,8 @@ import { initNarrative } from "./narrative.js";
 import { initExplorer } from "./explorer.js";
 import { loadJSON } from "./utils/data.js";
 
-// Entry point. Wires the map and the scrollytelling narrative together
-// once the DOM is ready. Individual modules are responsible for their
-// own rendering; this file only coordinates their lifecycle.
-
 async function init() {
-    // Core data loads eagerly — needed for the hero tape and the first
-    // scroll beat. Calendar heatmap (182KB) is deferred until the
-    // narrative has initialized so it doesn't block first paint.
+    // Calendar heatmap (182KB) is deferred so it doesn't block first paint.
     let topology, showcase, profilesData;
     try {
         [topology, showcase, profilesData] = await Promise.all([
@@ -32,14 +26,10 @@ async function init() {
 
     const map = createMap("#map-container", { topology, showcase });
 
-    // Start the narrative without the heatmap data — Steps 1-3, 5-7
-    // don't need it. The heatmap for Step 4 will be injected once the
-    // deferred load completes (typically before the reader reaches it).
+    // Steps 1-3, 5-7 don't need the heatmap — inject it into Step 4 once loaded.
     const narrative = initNarrative("#narrative", { map, showcase, calendarData: null, profilesData });
     initExplorer({ map, showcase, profilesData });
 
-    // Deferred: load the calendar heatmap data in the background and
-    // inject it into the narrative's Step 4 container when ready.
     loadJSON("calendar_heatmap.json").then((calendarData) => {
         if (calendarData && narrative?.injectCalendarHeatmap) {
             narrative.injectCalendarHeatmap(calendarData);
@@ -58,8 +48,7 @@ async function init() {
     setupFooterReveal();
     setupHeartbeatScope();
 
-    // Orientation change: dispatch a resize event after the viewport
-    // settles so all modules (narrative, explorer, map) recompute.
+    // Double-rAF lets the viewport settle before modules recompute.
     window.addEventListener("orientationchange", () => {
         requestAnimationFrame(() => requestAnimationFrame(() => {
             window.dispatchEvent(new Event("resize"));
@@ -69,13 +58,7 @@ async function init() {
     console.info("HSquareB initialized");
 }
 
-/**
- * Staggered scroll-triggered reveal for the footer. Fires as soon as the
- * footer starts entering the viewport (top edge within 120px of the viewport
- * bottom), adding `is-revealed` so the CSS cascade plays the staggered
- * entrance. A scroll-based fallback guarantees the content is never stuck
- * invisible if IntersectionObserver mis-fires on a given layout.
- */
+// Scroll fallback guards against IntersectionObserver mis-firing on certain layouts.
 function setupFooterReveal() {
     const footer = document.querySelector(".site-footer");
     if (!footer) return;
@@ -110,11 +93,7 @@ function setupFooterReveal() {
     window.addEventListener("scroll", fallback, { passive: true });
 }
 
-/**
- * Hide the map clock (and HUD) once the footer scrolls into view,
- * so those fixed-position readouts don't fight the footer's content
- * at the very bottom of the page.
- */
+// Hides fixed-position readouts once the footer is in view so they don't overlap.
 function setupFooterHide() {
     const footer = document.querySelector(".site-footer");
     if (!footer) return;
@@ -131,11 +110,7 @@ function setupFooterHide() {
     observer.observe(footer);
 }
 
-/**
- * Pause the --beat CSS animation while the hero is off-screen so
- * the 1Hz @property animation doesn't force style recalculations on
- * all beat-reading elements throughout the rest of the session.
- */
+// Pausing --beat off-hero avoids per-second style recalcs on every beat-reader.
 function setupHeartbeatScope() {
     const hero = document.querySelector(".hero");
     if (!hero) return;
@@ -145,14 +120,7 @@ function setupHeartbeatScope() {
     observer.observe(hero);
 }
 
-/**
- * Iris wipe — the map's vignette briefly contracts then expands as
- * the reader leaves the hero for the first time, with the grain
- * overlay flashing up simultaneously. An old news-broadcast "on-air"
- * cue signalling "the story begins now."
- *
- * Fires exactly once per page load, at ~25% of viewport scrolled.
- */
+// One-shot iris wipe at 25% scrolled — broadcast "on-air" cue as the story opens.
 const IRIS_THRESHOLD = 0.25;
 const IRIS_DURATION_MS = 700;
 
@@ -173,28 +141,16 @@ function setupIrisWipe() {
     window.addEventListener("scroll", onScroll, { passive: true });
 }
 
-/**
- * Map vertical scroll position to a subtle circadian color wash on the
- * map. The tint never fights the palette — it only interpolates between
- * very low-opacity versions of colors already in the design system:
- *
- *   top      → cold dawn (accent-dim)
- *   middle   → neutral calm
- *   lower    → warm solar (gen-solar, low opacity)
- *   near end → ice-cold (accent-glow, the shock)
- *
- * Written to `--atmos-tint` on :root and picked up by a CSS layer on
- * the map. Uses a single rAF loop shared with other scroll hooks.
- */
+// Scroll-driven tint on --atmos-tint: dawn → calm → solar → shock → exhale.
 function setupCircadianTint() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const root = document.documentElement;
     const stops = [
-        { at: 0.00, color: "rgba(14, 116, 144, 0.06)" },   // accent-dim — subtle dawn
-        { at: 0.30, color: "rgba(71, 85, 105, 0.04)" },    // slate neutral — calm
-        { at: 0.55, color: "rgba(251, 191, 36, 0.14)" },   // solar gold — warm peak (screen blend makes this visible)
-        { at: 0.80, color: "rgba(34, 211, 238, 0.08)" },   // cold cyan — shock approach
-        { at: 1.00, color: "rgba(224, 247, 255, 0.04)" },  // ice-white — exhale
+        { at: 0.00, color: "rgba(14, 116, 144, 0.06)" },
+        { at: 0.30, color: "rgba(71, 85, 105, 0.04)" },
+        { at: 0.55, color: "rgba(251, 191, 36, 0.14)" },   // solar gold — screen blend makes this visible
+        { at: 0.80, color: "rgba(34, 211, 238, 0.08)" },
+        { at: 1.00, color: "rgba(224, 247, 255, 0.04)" },
     ];
 
     const parseRGBA = (s) => {
@@ -221,8 +177,7 @@ function setupCircadianTint() {
         return stops[stops.length - 1].color;
     };
 
-    // scrollHeight triggers layout — cache it and invalidate only
-    // on resize. Without this, every scroll tick forces a reflow.
+    // scrollHeight triggers layout — cache and invalidate on resize only.
     let maxScroll = Math.max(0,
         document.documentElement.scrollHeight - window.innerHeight);
     let lastTintBucket = -1;
@@ -236,8 +191,7 @@ function setupCircadianTint() {
             const p = maxScroll > 0
                 ? Math.min(1, Math.max(0, window.scrollY / maxScroll))
                 : 0;
-            // Quantize to 50 buckets so successive near-identical
-            // scroll positions don't burn CPU resampling the gradient.
+            // Quantize so near-identical scroll positions don't resample the gradient.
             const bucket = Math.round(p * TINT_BUCKETS);
             if (bucket !== lastTintBucket) {
                 lastTintBucket = bucket;
@@ -256,21 +210,9 @@ function setupCircadianTint() {
     });
 }
 
-/**
- * Hero title reveal — split each title line into per-character spans
- * so the reveal feels like the letters are being struck one at a time
- * in Fraunces, rather than whole lines sliding up in unison.
- *
- * The walker preserves any wrapping element (`<em>`, the `.hero__amp`,
- * the terminal mark) so their styling continues to apply. Whitespace
- * is left as plain text and doesn't get its own span — spaces don't
- * need to animate, and keeping them as text nodes means the browser
- * handles line-breaking naturally.
- *
- * Per-line base delays stagger the start; per-char intra-line delays
- * stagger each letter by CHAR_STAGGER_MS so longer lines take longer
- * to finish.
- */
+// Splits hero title lines into per-char spans so letters strike one at a time.
+// Wrapping elements (<em>, .hero__amp) are preserved; whitespace stays as text
+// so the browser handles line-breaking.
 const TITLE_LINE_BASE_DELAYS_MS = [300, 550, 800];
 const TITLE_CHAR_STAGGER_MS = 28;
 
@@ -284,8 +226,6 @@ function setupHeroTitleReveal() {
         let charIdx = 0;
 
         const walk = (node) => {
-            // Text node — wrap each non-space char in a char span; leave
-            // whitespace as plain text so the browser can wrap lines.
             if (node.nodeType === Node.TEXT_NODE) {
                 const text = node.textContent;
                 if (!text) return [];
@@ -309,9 +249,8 @@ function setupHeroTitleReveal() {
                 return;
             }
 
-            // Element node — recurse into children (clone array since
-            // the mutation swaps children as we go).
             if (node.nodeType === Node.ELEMENT_NODE) {
+                // Clone childNodes since the walk mutates them.
                 const children = Array.from(node.childNodes);
                 for (const child of children) walk(child);
             }
@@ -321,8 +260,7 @@ function setupHeroTitleReveal() {
         line.classList.add("is-split");
     });
 
-    // Remove will-change after the reveal animation completes
-    // to free compositor layers that persist the entire session.
+    // Drop will-change after reveal so compositor layers don't persist all session.
     setTimeout(() => {
         document.querySelectorAll(".hero__title-char").forEach((el) => {
             el.style.willChange = "auto";
@@ -330,18 +268,7 @@ function setupHeroTitleReveal() {
     }, 3000);
 }
 
-/**
- * Hero cold-open teaser — after the title has fully landed (~2.3s in),
- * a single large price materializes, counts the reader from €45
- * (the midnight baseline) down to −€145.12 (the Sunday trough), holds
- * briefly, then fades out. The whole sequence is ~2.2s and plays once
- * per page load.
- *
- * The value tween is cubic-eased so the number doesn't feel like a
- * uniform drop — it accelerates through the negative crossing and
- * slows as it approaches the final reading, echoing a real market
- * moving through a shock.
- */
+// Hero cold-open — €45 baseline ticks down to the Sunday trough after the title lands.
 const COLDOPEN_START_DELAY_MS = 1800;
 const COLDOPEN_TWEEN_DELAY_MS = 350;
 const COLDOPEN_TWEEN_DUR_MS = 1100;
@@ -355,18 +282,12 @@ function setupHeroColdOpen() {
     const valueEl = el.querySelector("[data-coldopen-value]");
     if (!valueEl) return;
 
-    // Start at €45 so the first frame the reader sees matches the
-    // baseline. The tween kicks in COLDOPEN_TWEEN_DELAY_MS after the
-    // element has appeared.
     valueEl.textContent = formatColdOpenValue(COLDOPEN_START_VALUE);
 
     setTimeout(() => {
-        // Force a synchronous reflow so the browser commits the
-        // initial opacity: 0 to the paint pipeline BEFORE the class
-        // toggle pushes it to opacity: 1. Without this, some browsers
-        // batch both states into one paint and the CSS transition
-        // never fires (the element jumps from "never rendered" to
-        // "fully visible" in a single frame, skipping the 480ms ease).
+        // Force a synchronous reflow so opacity: 0 commits BEFORE the class
+        // toggle pushes to opacity: 1. Without this, some browsers batch both
+        // states into one paint and the CSS transition never fires.
         void el.offsetWidth;
         el.classList.add("is-showing");
     }, COLDOPEN_START_DELAY_MS);
@@ -375,8 +296,7 @@ function setupHeroColdOpen() {
         const start = performance.now();
         const tick = (now) => {
             const t = Math.min(1, (now - start) / COLDOPEN_TWEEN_DUR_MS);
-            // easeInOutCubic — accelerates through the zero crossing,
-            // decelerates onto the final reading.
+            // easeInOutCubic — accelerates through zero, decelerates onto the final value.
             const eased = t < 0.5
                 ? 4 * t * t * t
                 : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -390,9 +310,8 @@ function setupHeroColdOpen() {
         requestAnimationFrame(tick);
     }, COLDOPEN_START_DELAY_MS + COLDOPEN_TWEEN_DELAY_MS);
 
-    // No fade-out — the final value sticks so scrolling back to the
-    // top of the page finds the teaser still in place. The cold-open
-    // becomes a persistent anchor for the hero dispatch.
+    // No fade-out — the final value persists so scrolling back to the top
+    // still shows it, anchoring the hero.
 }
 
 function formatColdOpenValue(value) {
@@ -401,26 +320,11 @@ function formatColdOpenValue(value) {
     return `${sign}\u20AC${abs}`;
 }
 
-/**
- * Map tilt — a scroll-driven 3D perspective rotation on the sticky
- * map SVG. Nothing happens in the hero (the map is hidden behind it);
- * as the reader enters the scene and approaches the peak-moment card,
- * the map rotates ~8° on the X axis, as if tipping up to face the
- * reader. The tilt eases back down through the explorer.
- *
- * The raw signal comes from the scene's bounding rect so the curve
- * survives layout changes without recalculation.
- *
- * Implementation note: this is a pure presentation layer — the tilt
- * value is written to `--map-tilt` on `:root`, and the CSS transform
- * on `.scene__map svg` multiplies it by the max angle. No DOM writes
- * happen per-frame except the single custom-property update.
- */
+// Scroll-driven 3D tilt on the map SVG, peaking at Step 3. Writes --map-tilt
+// once per frame; CSS multiplies by the max angle.
 const MAP_TILT_MAX = 1;
 const MAP_TILT_EXPLORER = 0.42;
-// Tilt updates are quantized to 0.02 increments so scroll frames that
-// compute a near-identical value don't trigger a fresh CSS-variable
-// write (and the resulting GPU re-composite of the tilted SVG).
+// Quantize writes so near-identical values don't trigger a GPU re-composite.
 const MAP_TILT_QUANTUM = 0.02;
 
 function setupMapTilt() {
@@ -439,25 +343,18 @@ function setupMapTilt() {
             const vh = window.innerHeight;
             const sceneRect = scene.getBoundingClientRect();
 
-            // Scene hasn't entered the viewport — map is effectively
-            // hidden behind the hero. Keep the tilt at 0 so the first
-            // reveal lands on a flat plane.
+            // Keep tilt at 0 until the scene enters, so first reveal is flat.
             let tilt;
             if (sceneRect.top > vh * 0.65) {
                 tilt = 0;
             } else {
-                // Peak target — the tilt crescendoes when the peak
-                // card (Step 3) is centered in the viewport. That's
-                // the beat where CH drops below DE in the copy.
-                tilt = 0.2; // baseline entry tilt once scene is visible
+                tilt = 0.2;
                 if (peakCard) {
                     const peakRect = peakCard.getBoundingClientRect();
                     const peakCenter = peakRect.top + peakRect.height / 2;
                     const distFromMid = Math.abs(peakCenter - vh * 0.5);
-                    // Wider window (1.0×vh vs 0.6×vh) spreads the tilt
-                    // ramp over more scroll distance so the visual
-                    // displacement (~11px) accumulates gradually instead
-                    // of jumping abruptly near Step 3.
+                    // Wide 1.0×vh window spreads the ramp over more scroll
+                    // distance so the ~11px displacement accumulates gradually.
                     const proximity = Math.max(0, 1 - distFromMid / (vh * 1.0));
                     tilt = Math.max(tilt, proximity * MAP_TILT_MAX);
                 }
@@ -480,16 +377,7 @@ function setupMapTilt() {
     window.addEventListener("resize", update);
 }
 
-/**
- * Spot-price tape — the trading-floor ticker under the hero byline.
- *
- * Cycles through 4 key hours of the showcase day every 5.5 seconds,
- * flashing each quote briefly as it updates and re-styling negative
- * prices with the true minus sign + ice-white glow color.
- *
- * Hours chosen tell the whole story in preview: midnight calm,
- * mid-morning dip, peak negative shock, evening recovery.
- */
+// Hero ticker — 4 hours preview the whole day: calm, dip, shock, recovery.
 const TAPE_HOURS = [0, 10, 13, 19];
 const TAPE_INTERVAL_MS = 5500;
 
@@ -518,7 +406,6 @@ function setupSpotTape(showcase) {
             const price = entry.price;
             el.textContent = formatPrice(price);
             el.classList.toggle("is-negative", price < 0);
-            // Brief "flash" on update so the reader sees motion
             el.classList.add("is-flash");
             setTimeout(() => el.classList.remove("is-flash"), 480);
         }
@@ -548,17 +435,12 @@ function setupSpotTape(showcase) {
 
 function formatPrice(value) {
     const abs = Math.abs(value).toFixed(0);
-    const sign = value < 0 ? "\u2212" : ""; // U+2212
+    const sign = value < 0 ? "\u2212" : "";
     return `${sign}${abs}`;
 }
 
-/**
- * Parallax the hero lines as the reader scrolls out of the opening
- * screen. Each title line drifts up at a slightly different rate,
- * the eyebrow/masthead fade first, the lede last. The whole hero
- * becomes transparent by the time it has scrolled half out of view
- * so the map underneath reveals cleanly.
- */
+// Hero parallax — title lines drift at different rates; hero fully fades by
+// half-viewport scrolled so the map reveals cleanly.
 const HERO_REVEAL_DURATION_MS = 2400;
 
 function setupHeroParallax() {
@@ -571,17 +453,12 @@ function setupHeroParallax() {
     const lede = hero.querySelector(".hero__lede");
     const signature = hero.querySelector(".hero__signature");
 
-    // The CSS reveal animation owns these properties during the
-    // opening sequence. Don't touch them until the reveal is done,
-    // otherwise inline styles fight keyframes mid-animation.
+    // Wait for the CSS reveal to finish — inline styles would fight the keyframes.
     let armed = false;
     const armTimer = setTimeout(() => { armed = true; onScroll(); }, HERO_REVEAL_DURATION_MS);
 
     let ticking = false;
-    // Quantize progress so near-identical scroll positions don't
-    // trigger redundant style writes. 60 steps ≈ 1.5% of the hero
-    // range, fine enough for smooth parallax but coarse enough to
-    // elide most scroll events once the hero has fully cleared.
+    // 60 steps ≈ 1.5% — smooth enough for parallax, coarse enough to skip most scrolls.
     let lastProgressStep = -1;
     const onScroll = () => {
         if (!armed) return;
@@ -597,7 +474,6 @@ function setupHeroParallax() {
             }
             lastProgressStep = step;
 
-            // Each title line drifts up at a different rate for subtle parallax
             titleLines.forEach((line, i) => {
                 const factor = 40 + i * 28;
                 const fade = Math.max(0, 1 - progress * 1.4);
@@ -620,10 +496,8 @@ function setupHeroParallax() {
                 signature.style.transform = `translate3d(0, ${-progress * 14}px, 0)`;
                 signature.style.opacity = `${Math.max(0, 1 - progress * 1.1)}`;
             }
-            // Note: handler stays attached so scrolling back up to
-            // the hero re-runs the transforms in reverse and the
-            // title/lede/tape all reappear. Early detach caused a
-            // regression where the hero stayed invisible forever.
+            // Keep handler attached — scrolling back up must reverse the
+            // transforms. Early detach left the hero invisible forever.
             ticking = false;
         });
     };
@@ -632,12 +506,7 @@ function setupHeroParallax() {
     return () => { clearTimeout(armTimer); };
 }
 
-/**
- * Cursor-following soft glow on the hero background. A low-intensity
- * radial gradient whose center tracks the mouse, creating the feeling
- * that the reader's attention leaves a trace. Only active inside the
- * hero itself, disabled on touch/reduced-motion.
- */
+// Cursor-tracking radial gradient on the hero. Disabled on touch/reduced-motion.
 function setupCursorLight() {
     const hero = document.querySelector(".hero");
     if (!hero) return;
@@ -655,7 +524,7 @@ function setupCursorLight() {
     hero.addEventListener("pointermove", update);
 }
 
-// Suppress iOS long-press context menu on charts and map
+// Suppress iOS long-press context menu on charts and map.
 document.addEventListener("contextmenu", (e) => {
     if (e.target.closest("#map-container, .gen-stack, .daily-profile, .cal-heatmap")) {
         e.preventDefault();

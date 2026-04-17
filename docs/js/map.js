@@ -1,46 +1,34 @@
-// Map module — renders the five-country topology and exposes a tiny
-// controller surface (`update`, `destroy`) the rest of the app uses to
-// drive state changes during scroll. Colors, flow arrows, price labels,
-// and the big on-map clock all live here.
-
 import * as d3 from "d3";
 import * as topojson from "topojson-client";
 
 import { priceContinuous, renewableAmountColor } from "./utils/colors.js";
 
-// Conic conformal centered on central Europe. Tuned so the five focus
-// countries fill the viewport with Switzerland slightly above visual center.
+// Conic conformal centered on central Europe — tuned so the five countries
+// fill the viewport with CH slightly above visual center.
 const PROJECTION_CONFIG = {
     center: [10, 48],
     rotate: [-10, 0, 0],
     parallels: [43, 55],
 };
 
-// The geometry is rendered once and then re-fitted on window resize.
 const FIT_PADDING = 64;
 
-// Concentric graticule circles — a cartographic atlas touch that also
-// reads as a power-grid radar sweep. Rendered as distance rings around
-// the map's anchor point (Munich, roughly 48N 10E) in kilometres.
+// Distance rings around the anchor (Munich, ~48N 10E) in kilometres.
 const GRATICULE_RINGS_KM = [200, 400, 600, 800];
 const GRATICULE_ANCHOR = [10, 48];
 const GRATICULE_MERIDIANS = [0, 5, 10, 15, 20];
 const GRATICULE_PARALLELS = [40, 45, 50, 55];
 const EARTH_KM_PER_DEGREE = 111.32;
 
-// Cartographic cartouche — compass rose + scale bar. Positioned in the
-// viewport's bottom-left clear of the clock (bottom-right) and the HUD
-// (top-right). Measured in CSS pixels against the fitted viewBox so
-// they sit at fixed offsets regardless of resize.
+// Cartouche measured in CSS pixels against the fitted viewBox so it
+// stays pinned bottom-left regardless of resize (clear of clock + HUD).
 const CARTOUCHE_MARGIN_X = 42;
 const CARTOUCHE_BOTTOM = 120;
 const COMPASS_RADIUS = 24;
 const SCALE_BAR_KM = 200;
 
-// Per-country label position overrides (added to the geometric centroid).
-// CH and AT are small and their centroids land awkwardly on borders; we
-// nudge in whichever direction gives the cleanest placement. Values are
-// in projected pixel space (post-fitExtent), roughly in the 0..~1440 range.
+// CH and AT centroids land on borders; nudge values in projected pixel
+// space (post-fitExtent) give cleaner label placement.
 const LABEL_NUDGE_PX = {
     CH: [-4, 4],
     AT: [4, 6],
@@ -49,10 +37,8 @@ const LABEL_NUDGE_PX = {
     IT: [-14, 10],
 };
 
-// Interconnector pairs — the 8 connected markets where a price gradient
-// implies cross-border electricity flow. Direction is inferred from the
-// price differential (low → high): money follows the gradient, so flow
-// does too.
+// 8 connected markets. Flow direction is inferred from price differential:
+// money (and electricity) follows the gradient, low → high.
 const INTERCONNECTORS = [
     ["CH", "DE"],
     ["CH", "FR"],
@@ -64,37 +50,25 @@ const INTERCONNECTORS = [
     ["AT", "IT"],
 ];
 
-// Spread threshold (EUR/MWh) below which arrows are suppressed entirely
-// — a tiny price differential rarely produces material cross-border flow
-// and makes the map noisy.
+// Below 5 EUR/MWh, cross-border flow is immaterial and the map gets noisy.
 const ARROW_SPREAD_THRESHOLD = 5;
 
-// Linear mapping from |spread| → stroke width in pixels. At 150 EUR
-// spread (CH→IT at the peak moment) the arrow reaches MAX_WIDTH.
+// 150 EUR spread is CH→IT at the peak moment; that's where the arrow maxes out.
 const ARROW_MIN_WIDTH = 1.4;
 const ARROW_MAX_WIDTH = 6;
 const ARROW_WIDTH_PIVOT = 150;
 
-// Particle flow — a generative dot stream riding each active flow path.
-// Replaces the old marching-ants dashed stroke with something that feels
-// like actual current moving through the interconnector. The guide path
-// remains in the DOM at very low opacity so the reader still sees the
-// route when no particles happen to be on it.
-//
-// Density scales with |spread|: a small 10 EUR differential carries a
-// handful of particles; the 150 EUR peak-moment shocks swarm. Particles
-// are pooled per flow and recycled (t wraps from 1 → 0) so the DOM
-// population stays flat once a flow is active.
+// Particles pooled per flow; t wraps 1→0 so DOM population stays flat.
+// Density scales with |spread|. Guide path stays at low opacity as a fallback
+// when no particle happens to be on the route.
 const PARTICLE_MIN_COUNT = 4;
 const PARTICLE_MAX_COUNT = 14;
 const PARTICLE_BASE_RADIUS = 1.6;
 const PARTICLE_FOCUS_RADIUS = 2.4;
 const PARTICLE_BASE_SPEED = 0.00035; // fraction of path length per ms
 const PARTICLE_FOCUS_SPEED = 0.00055;
-// Number of pre-sampled (x,y) points per flow path. Each particle
-// looks up its position in this table on every frame instead of
-// calling SVG getPointAtLength, which is ~50x cheaper on the main
-// thread for ~60 particles × 60fps.
+// Pre-sampled lookup table per flow — ~50x cheaper than per-frame
+// getPointAtLength for ~60 particles at 60fps.
 const PARTICLE_PATH_SAMPLES = 96;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -106,7 +80,6 @@ export function createMap(selector, config) {
 
     const { topology, showcase } = config;
     const countries = topojson.feature(topology, topology.objects.countries);
-    // Stable ISO → feature map for fast lookups.
     const featureByIso = new Map(countries.features.map((f) => [f.id, f]));
 
     const svg = d3
@@ -116,10 +89,8 @@ export function createMap(selector, config) {
         .attr("role", "img")
         .attr("aria-label", "Map of Switzerland, Germany, France, Italy and Austria");
 
-    // Shared <defs> block — holds the arrow marker + the particle glow
-    // filter. A single group-level filter on the `.particles` layer
-    // replaces ~60 individual `drop-shadow(...)` CSS filters and cuts
-    // the per-frame raster cost by roughly an order of magnitude.
+    // One group-level filter replaces ~60 per-particle drop-shadows —
+    // roughly an order of magnitude cheaper per frame.
     const defs = svg.append("defs");
     defs.append("marker")
         .attr("id", "flow-arrow-head")
@@ -133,9 +104,6 @@ export function createMap(selector, config) {
         .attr("d", "M 0 1 L 8 5 L 0 9 z")
         .attr("fill", "context-stroke");
 
-    // Particle glow — feGaussianBlur on the alpha channel, flood to
-    // cyan, composite on top of the source. One filter, applied once
-    // to the particle group.
     const particleFilter = defs.append("filter")
         .attr("id", "particle-glow")
         .attr("x", "-50%").attr("y", "-50%")
@@ -163,9 +131,7 @@ export function createMap(selector, config) {
 
     const pathGen = d3.geoPath(projection);
 
-    // Layer order: graticule → countries → flow guides → particles →
-    // labels → cartouche. Cartouche sits on top so compass + scale bar
-    // always remain legible above country fills.
+    // Order matters: cartouche last so compass + scale bar stay legible above fills.
     const gGraticule = svg.append("g").attr("class", "graticule");
     const gRings = svg.append("g").attr("class", "graticule__rings");
     const gCountries = svg.append("g").attr("class", "countries");
@@ -177,11 +143,8 @@ export function createMap(selector, config) {
     const gLabels = svg.append("g").attr("class", "labels");
     const gCartouche = svg.append("g").attr("class", "cartouche");
 
-    // Build the cartouche once — its internal geometry is static
-    // (compass tick angles, bar sub-divisions). The outer transform is
-    // re-applied on every resize to keep it pinned to the viewport
-    // bottom-left. Scale bar pixel length is also computed per-resize
-    // against the projection.
+    // Internal geometry is static; outer transform and scale bar length
+    // are recomputed per-resize against the projection.
     const gCompass = gCartouche.append("g").attr("class", "cartouche__compass");
     gCompass.append("circle")
         .attr("class", "cartouche__compass-ring")
@@ -189,7 +152,6 @@ export function createMap(selector, config) {
     gCompass.append("circle")
         .attr("class", "cartouche__compass-ring cartouche__compass-ring--inner")
         .attr("r", COMPASS_RADIUS - 6);
-    // Eight-point tick marks, longer on the cardinals.
     for (let i = 0; i < 16; i++) {
         const angle = (i / 16) * Math.PI * 2;
         const isCardinal = i % 4 === 0;
@@ -203,13 +165,9 @@ export function createMap(selector, config) {
             .attr("x2", Math.sin(angle) * outer)
             .attr("y2", -Math.cos(angle) * outer);
     }
-    // North-pointing arrow — a thin isoceles triangle from center to
-    // the inner-ring top. The cyan/glow stroke gives it the only color
-    // accent on the cartouche so it naturally draws the eye.
     gCompass.append("path")
         .attr("class", "cartouche__compass-needle")
         .attr("d", `M0,${-COMPASS_RADIUS + 3} L3,4 L0,0 L-3,4 Z`);
-    // Cardinal letters — N only (keeps it minimal).
     gCompass.append("text")
         .attr("class", "cartouche__compass-letter")
         .attr("y", -COMPASS_RADIUS - 7)
@@ -241,9 +199,7 @@ export function createMap(selector, config) {
         .attr("y", 16)
         .text(SCALE_BAR_KM);
 
-    // Graticule edge labels — degree readouts on meridians (top edge)
-    // and parallels (left edge). Built once, positioned per-resize so
-    // they always sit just inside the viewport frame.
+    // Built once; positioned per-resize to stay just inside the viewport frame.
     const gEdgeLabels = gCartouche.append("g").attr("class", "cartouche__edges");
     const meridianLabels = gEdgeLabels
         .selectAll("text.cartouche__edge-lon")
@@ -258,7 +214,6 @@ export function createMap(selector, config) {
         .attr("class", "cartouche__edge-label cartouche__edge-lat")
         .text((d) => `${d}°N`);
 
-    // Meridians + parallels — thin dashed hairlines covering the region.
     const meridianLines = gGraticule
         .selectAll("path.graticule__meridian")
         .data(GRATICULE_MERIDIANS)
@@ -271,7 +226,6 @@ export function createMap(selector, config) {
         .join("path")
         .attr("class", "graticule__line graticule__parallel");
 
-    // Concentric distance rings around the anchor point.
     const ringCircles = gRings
         .selectAll("circle.graticule__ring")
         .data(GRATICULE_RINGS_KM)
@@ -279,7 +233,6 @@ export function createMap(selector, config) {
         .attr("class", "graticule__ring")
         .attr("fill", "none");
 
-    // Anchor cross at the map's geographic center — a tiny "+" glyph.
     const crosshair = gRings.append("g").attr("class", "graticule__crosshair");
     crosshair.append("line").attr("class", "graticule__crosshair-line");
     crosshair.append("line").attr("class", "graticule__crosshair-line");
@@ -295,16 +248,11 @@ export function createMap(selector, config) {
         .join("path")
         .attr("class", "country")
         .attr("data-iso", (d) => d.id)
-        // Keyboard + assistive-tech affordances. The click wiring in
         // explorer.js mirrors Enter/Space to the same toggle handler.
         .attr("tabindex", 0)
         .attr("role", "button")
         .attr("aria-label", (d) => `Show details for ${COUNTRY_NAMES[d.id] || d.id}`);
 
-    // Country hover tooltip — shows price, renewable share, and
-    // country name on mouseover. Positioned near the cursor via
-    // pointer events on the country paths. Only active when the map
-    // has a valid hour (labels are visible).
     const tipEl = document.createElement("div");
     tipEl.className = "map-tip mono";
     tipEl.style.display = "none";
@@ -332,7 +280,6 @@ export function createMap(selector, config) {
             tipEl.style.display = "none";
         });
 
-    // ---- Price legend (gradient bar + ticks) ----
     const legendEl = container.querySelector(".map-legend");
     const arrowLegendEl = container.querySelector(".arrow-legend");
     if (legendEl) {
@@ -342,19 +289,18 @@ export function createMap(selector, config) {
             const ctx = canvas.getContext("2d");
             const w = canvas.width;
             const grad = ctx.createLinearGradient(0, 0, w, 0);
-            // Map the priceContinuous domain [-200..300] onto [0..1].
+            // priceContinuous domain [-200..300] mapped onto [0..1].
             const domain = [-200, -100, -50, 0, 40, 75, 150, 300];
             const colors = [
                 "#e0f7ff", "#67e8f9", "#22d3ee", "#0e7490",
                 "#78716c", "#e8a460", "#ef4444", "#991b1b",
             ];
-            const range = domain[domain.length - 1] - domain[0]; // 500
+            const range = domain[domain.length - 1] - domain[0];
             for (let i = 0; i < domain.length; i++) {
                 grad.addColorStop((domain[i] - domain[0]) / range, colors[i]);
             }
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, w, canvas.height);
-            // Tick labels at key price points.
             [-100, 0, 100, 200].forEach((p) => {
                 const span = document.createElement("span");
                 span.textContent = p < 0 ? `\u2212${Math.abs(p)}` : String(p);
@@ -363,9 +309,6 @@ export function createMap(selector, config) {
         }
     }
 
-    // Label groups — one per country. Each group holds two <text> nodes
-    // (ISO code above, price below) plus an invisible halo rect that we
-    // can show behind the label on the peak moment.
     const labelGroups = gLabels
         .selectAll("g.label")
         .data(countries.features)
@@ -383,13 +326,9 @@ export function createMap(selector, config) {
 
     function resize() {
         let { clientWidth, clientHeight } = container;
-        // The map container is position:fixed; inset:0 so its layout
-        // size always equals the viewport. If clientWidth/Height are
-        // still 0 on first-paint bootstrap, fall back to the viewport
-        // itself so the projection fits correctly and centroids get
-        // computed. Without this fallback, the leader line never
-        // appears during the narrative because getCountryCentroidPx
-        // returns null on every step enter.
+        // Container is position:fixed; inset:0 so layout size == viewport.
+        // On first-paint bootstrap clientWidth/Height can still be 0 — fall
+        // back to the viewport so centroids compute and leader lines appear.
         if (!clientWidth) clientWidth = window.innerWidth;
         if (!clientHeight) clientHeight = window.innerHeight;
         if (!clientWidth || !clientHeight) return;
@@ -404,7 +343,6 @@ export function createMap(selector, config) {
 
         countryPaths.attr("d", pathGen);
 
-        // Draw meridians as line segments spanning the parallel extent.
         const [lat0, lat1] = [
             GRATICULE_PARALLELS[0],
             GRATICULE_PARALLELS[GRATICULE_PARALLELS.length - 1],
@@ -423,8 +361,7 @@ export function createMap(selector, config) {
             return d3.line()(samples.map((p) => projection(p)));
         });
 
-        // Concentric rings use projected distance: convert km → degrees,
-        // then measure the projected distance along the north meridian.
+        // km → degrees, then measure projected distance along the north meridian.
         const anchorXY = projection(GRATICULE_ANCHOR);
         ringCircles
             .attr("cx", anchorXY[0])
@@ -435,7 +372,6 @@ export function createMap(selector, config) {
                 return Math.hypot(edge[0] - anchorXY[0], edge[1] - anchorXY[1]);
             });
 
-        // Anchor crosshair — 8px horizontal and vertical ticks at center.
         const ch = crosshair.selectAll(".graticule__crosshair-line");
         ch.filter((_, i) => i === 0)
             .attr("x1", anchorXY[0] - 6).attr("y1", anchorXY[1])
@@ -444,7 +380,6 @@ export function createMap(selector, config) {
             .attr("x1", anchorXY[0]).attr("y1", anchorXY[1] - 6)
             .attr("x2", anchorXY[0]).attr("y2", anchorXY[1] + 6);
 
-        // Position label groups at each country's centroid + nudge.
         labelGroups.attr("transform", (d) => {
             const [lon, lat] = d3.geoCentroid(d);
             const [px, py] = projection([lon, lat]);
@@ -455,13 +390,8 @@ export function createMap(selector, config) {
         labelGroups.select(".label__code").attr("y", -8);
         labelGroups.select(".label__price").attr("y", 10);
 
-        // Cartouche — compass rose in the bottom-left corner, scale
-        // bar above it. Positioned in absolute viewBox pixel coords so
-        // it stays pinned regardless of resize. Scale bar pixel length
-        // is recomputed from the current projection by measuring the
-        // projected distance for SCALE_BAR_KM along the north meridian
-        // at the anchor latitude — what the reader sees as "200 km"
-        // is the same 200 km wherever they would measure it.
+        // Scale bar pixel length is recomputed from the current projection
+        // so "200 km" on-screen matches 200 km on the ground at any resize.
         const compassX = CARTOUCHE_MARGIN_X + COMPASS_RADIUS + 4;
         const compassY = clientHeight - CARTOUCHE_BOTTOM - COMPASS_RADIUS - 48;
         gCompass.attr("transform", `translate(${compassX}, ${compassY})`);
@@ -491,9 +421,7 @@ export function createMap(selector, config) {
         gScale.select(".cartouche__scale-origin").attr("x", 0);
         gScale.select(".cartouche__scale-end").attr("x", scaleLenPx);
 
-        // Edge labels — meridians pinned to the top inside-edge, parallels
-        // to the right inside-edge. Use a small inset so they sit clear
-        // of the scroll-progress bar and the HUD.
+        // Inset from viewport edge so labels clear the progress bar and HUD.
         const edgePad = 16;
         meridianLabels
             .attr("x", (lon) => projection([lon, GRATICULE_PARALLELS[GRATICULE_PARALLELS.length - 1]])[0])
@@ -502,8 +430,7 @@ export function createMap(selector, config) {
             .attr("x", clientWidth - edgePad - 4)
             .attr("y", (lat) => projection([GRATICULE_MERIDIANS[GRATICULE_MERIDIANS.length - 1], lat])[1]);
 
-        // Centroid cache used by the flow layer. Indexed by ISO code,
-        // values are projected [x, y] in pixel space.
+        // Flow layer reads projected centroids from this cache.
         centroidPx = new Map(
             countries.features.map((f) => {
                 const [lon, lat] = d3.geoCentroid(f);
@@ -511,13 +438,10 @@ export function createMap(selector, config) {
             }),
         );
 
-        // If we have an active state, redraw the flows with the new
-        // centroid positions after a resize.
         if (state.hour != null) drawFlows();
     }
 
-    // Must be declared BEFORE the first resize() call because resize()
-    // reads from `state` when deciding whether to redraw flows.
+    // Declared BEFORE the first resize() — resize() reads state.hour.
     const state = {
         hour: null,
         focusCountry: null,
@@ -525,24 +449,14 @@ export function createMap(selector, config) {
         colorMode: "price", // "price" or "renewable"
     };
 
-    // Populated on every resize; read by drawFlows().
     let centroidPx = new Map();
 
-    // Particle pool keyed by flow id ("CH-DE" etc). Each entry carries
-    // the measured path length, a focus flag, and an array of particle
-    // state objects. The pool is rebuilt whenever drawFlows() runs so
+    // Keyed by flow id ("CH-DE"); rebuilt on each drawFlows() so
     // count/speed/radius track the current spread and focus country.
     const particlePools = new Map();
     let particleRafId = null;
     let particleLastTs = null;
 
-    /**
-     * Render SVG flow arrows between every connected market pair with
-     * a material price differential. Arrows go from low-price to
-     * high-price (direction money would push electricity) with
-     * thickness proportional to |spread|. Re-runs on every `update()`
-     * and after resize.
-     */
     function drawFlows() {
         if (state.hour == null || !showcase) return;
 
@@ -554,14 +468,12 @@ export function createMap(selector, config) {
             const spread = Math.abs(pa - pb);
             if (spread < ARROW_SPREAD_THRESHOLD) continue;
 
-            // Flow direction: money follows the gradient. Low price is
-            // the source (oversupply), high price is the destination.
+            // Low price is the oversupply source; high price the destination.
             const [fromIso, toIso] = pa < pb ? [a, b] : [b, a];
             const fromXY = centroidPx.get(fromIso);
             const toXY = centroidPx.get(toIso);
             if (!fromXY || !toXY) continue;
 
-            // Highlight the strongest arrow touching the focus country.
             const touchesFocus =
                 state.focusCountry != null &&
                 (fromIso === state.focusCountry || toIso === state.focusCountry);
@@ -577,21 +489,17 @@ export function createMap(selector, config) {
             });
         }
 
-        // Stable key so persistent arrows reuse the same DOM node and
-        // morph smoothly instead of being destroyed and recreated.
+        // Stable key so persistent arrows morph instead of being recreated.
         const selection = gFlows
             .selectAll("path.flow")
             .data(flows, (d) => d.id);
 
-        // Transition duration matches the country fill transition so
-        // colors, labels, and arrows all land together as one beat.
+        // Matches the country-fill transition so colors + arrows land as one beat.
         const DUR = 800;
         const EASE = d3.easeCubicOut;
 
-        // Exit — collapse the arrow back to a degenerate dot at its
-        // origin point, fading stroke-opacity over the same beat.
-        // `d` is tweened via d3.interpolateString, so persistent
-        // structure (M _ Q _ _) lets us land smoothly at the source.
+        // Collapse to a degenerate dot at origin. The persistent "M _ Q _ _"
+        // structure is required for d3.interpolateString to tween `d` cleanly.
         selection.exit()
             .transition().duration(DUR).ease(EASE)
             .attrTween("d", function (d) {
@@ -603,11 +511,8 @@ export function createMap(selector, config) {
             .attr("stroke-width", 0)
             .remove();
 
-        // Enter — new arrows start as a degenerate dot at the SOURCE
-        // country with zero width and zero opacity. The shared merge
-        // transition below then tweens `d` through d3's string
-        // interpolator, producing a visible "growth" from source to
-        // destination in the same 800ms beat.
+        // New arrows start as a dot at the source; the merge transition
+        // below grows them to the destination via d3.interpolateString.
         const enter = selection.enter()
             .append("path")
             .attr("class", "flow")
@@ -618,13 +523,8 @@ export function createMap(selector, config) {
             .attr("stroke-width", 0)
             .attr("d", (d) => degeneratePath(d.fromXY));
 
-        // Merge — tween `d`, stroke-width, and stroke-opacity together
-        // on the same curve. `attrTween` on `d` uses d3's string
-        // interpolator which handles matching-structure paths cleanly.
-        //
-        // Note: the guide path is now a dim channel rather than the
-        // marching-ants hero. The real motion lives in the particle
-        // layer driven by syncParticlePools() below.
+        // Guide path is deliberately dim — the real motion is on the
+        // particle layer (syncParticlePools).
         enter.merge(selection)
             .classed("flow--focus", (d) => d.touchesFocus)
             .transition().duration(DUR).ease(EASE)
@@ -639,19 +539,9 @@ export function createMap(selector, config) {
         syncParticlePools(flows);
     }
 
-    /**
-     * Rebuild the particle pools so the set of active flows and the
-     * density of each matches the current spread/focus state.
-     *
-     * Each pool carries a pre-sampled (x, y) lookup table of points
-     * along its bezier path so the hot loop never has to call
-     * getPointAtLength. Existing pools for flows that persist are
-     * reused (so t-values don't reset), but their sample table and
-     * density are refreshed. Flows that disappeared get their DOM
-     * nodes removed. New flows get a fresh pool whose particles are
-     * initialized at staggered t values so the stream doesn't clump
-     * at the origin.
-     */
+    // Existing pools are reused (t-values survive) but their sample
+    // table and density are refreshed; new pools stagger initial t so
+    // the stream doesn't clump at the origin.
     function syncParticlePools(flows) {
         const nextIds = new Set(flows.map((f) => f.id));
 
@@ -672,8 +562,7 @@ export function createMap(selector, config) {
                 pool = {
                     id: flow.id,
                     groupNode,
-                    // Float32Array of [x0, y0, x1, y1, ...] of length
-                    // PARTICLE_PATH_SAMPLES * 2.
+                    // [x0, y0, x1, y1, ...] of length PARTICLE_PATH_SAMPLES * 2.
                     samples: new Float32Array(PARTICLE_PATH_SAMPLES * 2),
                     particles: [],
                     touchesFocus: flow.touchesFocus,
@@ -713,7 +602,7 @@ export function createMap(selector, config) {
             const p = pool.particles.pop();
             p.node.remove();
         }
-        // Focus state might have flipped — refresh r/class on kept nodes.
+        // Focus may have flipped — refresh r/class on kept nodes.
         for (const p of pool.particles) {
             p.node.setAttribute("r", radius);
             p.node.setAttribute("class",
@@ -725,8 +614,7 @@ export function createMap(selector, config) {
         window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     function ensureParticleLoop() {
-        // When the user prefers reduced motion, the static flow guide
-        // lines are sufficient — skip the animated particle stream.
+        // Reduced-motion users get the static guide lines only.
         if (prefersReducedMotion) return;
         if (particleRafId != null) return;
         particleLastTs = null;
@@ -752,8 +640,7 @@ export function createMap(selector, config) {
                     const envelope = Math.sin(Math.PI * p.t);
                     const i = (p.t * lastIdx) | 0;
                     const node = p.node;
-                    // Single transform write + style opacity — two
-                    // mutations per particle per frame, no d3 wrapping.
+                    // Raw DOM writes — skipping d3 wrapping keeps this to two mutations/particle/frame.
                     node.setAttribute(
                         "transform",
                         `translate(${samples[i * 2]},${samples[i * 2 + 1]})`,
@@ -767,12 +654,7 @@ export function createMap(selector, config) {
         particleRafId = requestAnimationFrame(tick);
     }
 
-    /**
-     * Pre-sample a bezier flow path between two points into a
-     * typed-array lookup table. Uses a detached <path> element to
-     * call getPointAtLength once per sample; the detached path is
-     * discarded after sampling.
-     */
+    // Uses a detached <path> for getPointAtLength; discarded after sampling.
     function samplePathInto(samples, fromXY, toXY) {
         const measure = document.createElementNS(SVG_NS, "path");
         measure.setAttribute("d", flowPath(fromXY, toXY));
@@ -796,24 +678,16 @@ export function createMap(selector, config) {
     window.addEventListener("resize", resize);
 
     /**
-     * Update the map state to a specific hour on the showcase day,
-     * optionally with a "focus country" that receives a larger,
-     * glowing label treatment (the card's target country).
-     *
-     * Accepts:
-     *   { hour: 13, focusCountry: "CH" }   — apply prices + focus
-     *   { hour: null }                      — reset to base (dark) state
+     * Update the map to a given hour and optional focus country.
+     * Pass `{ hour: null }` to reset to the dark base state.
      */
     function update(next) {
         Object.assign(state, next);
 
-        // Fill each country with its price color at the current hour.
-        // Toggle legend visibility with the map's active state.
         if (legendEl) legendEl.classList.toggle("is-visible", state.hour != null && !!showcase);
         if (arrowLegendEl) arrowLegendEl.classList.toggle("is-visible", state.hour != null && !!showcase);
 
         if (state.hour == null || !showcase) {
-            // Reset — base state, no colors, no labels, no flows.
             countryPaths
                 .interrupt()
                 .classed("is-focus-country", false)
@@ -826,12 +700,8 @@ export function createMap(selector, config) {
             return;
         }
 
-        // Highlight the focus country's own shape so the 3D-tilt CSS
-        // layer can lift it forward. `is-focus-country` is also used
-        // by the focus-target drop-shadow in the map CSS.
-        // Secondary highlights (comparison countries for the same beat)
-        // get a dimmer contour so both are visible but the hierarchy
-        // is clear.
+        // is-focus-country drives the 3D-tilt lift + focus drop-shadow in CSS.
+        // is-secondary-focus gives comparison countries a dimmer contour.
         const hl = new Set(state.highlightCountries || []);
         countryPaths
             .classed("is-focus-country", (d) => d.id === state.focusCountry)
@@ -841,19 +711,10 @@ export function createMap(selector, config) {
 
         labelGroups.classed("is-visible", true);
 
-        // Set the fill attribute immediately — the CSS `transition:
-        // fill 800ms ease-cinematic` on `.country` handles the
-        // interpolation. This keeps fill on the exact same easing
-        // curve and start time as stroke, transform, and filter,
-        // so the colour and the contour arrive as one beat.
-        // (Previously a D3 `.transition()` drove fill via rAF on a
-        // slightly different curve, desyncing it from the CSS-driven
-        // contour properties.)
-        // Write the fill as an inline style (not an SVG attribute) so
-        // the CSS transition engine owns the interpolation on the same
-        // compositor pass as stroke/transform/filter. Setting it as an
-        // attribute caused some browsers to start the fill transition
-        // one frame later than the CSS-driven stroke transition.
+        // Fill is written as inline style (not SVG attr) so CSS owns the
+        // 800ms transition alongside stroke/transform/filter on the same
+        // compositor pass. Setting it as an attribute desyncs fill from
+        // the CSS-driven contour by one frame in some browsers.
         countryPaths.each(function (d) {
             const entry = showcase.countries?.[d.id]?.[state.hour];
             if (!entry) { this.style.fill = ""; return; }
@@ -863,8 +724,7 @@ export function createMap(selector, config) {
             this.style.fill = color || "";
         });
 
-        // Update label text + focus state. The focus country gets the
-        // large "hero number" treatment — other countries stay compact.
+        // Focus country gets the large "hero number" treatment via the is-focus class.
         labelGroups.each(function (d) {
             const entry = showcase.countries?.[d.id]?.[state.hour];
             const g = d3.select(this);
@@ -884,19 +744,14 @@ export function createMap(selector, config) {
         drawFlows();
     }
 
-    /**
-     * Project a country's centroid to viewport coordinates.
-     * Used by narrative.js to draw leader lines from card edges to
-     * the country a step is talking about.
-     */
+    // narrative.js uses this to draw leader lines from cards to a country.
     function getCountryCentroidPx(iso) {
         const feature = countries.features.find((f) => f.id === iso);
         if (!feature) return null;
-        // d3.geoCentroid → [lon, lat]; project to pixel space.
         const [lon, lat] = d3.geoCentroid(feature);
         const px = projection([lon, lat]);
         if (!px) return null;
-        // The container is position:fixed, so its rect is in viewport coords.
+        // Container is position:fixed, so its rect is in viewport coords.
         const rect = container.getBoundingClientRect();
         return { x: rect.left + px[0], y: rect.top + px[1] };
     }
@@ -912,11 +767,7 @@ export function createMap(selector, config) {
     return { update, destroy, getCountryCentroidPx };
 }
 
-/**
- * Format a price as a JetBrains Mono-friendly string with a true
- * Unicode minus (U+2212) for negatives. Produces compact values like
- * "€45" for positives, "−€145" for negatives.
- */
+// Uses U+2212 (true minus) so monospace rendering lines up with digits.
 function formatPrice(value) {
     if (value == null || Number.isNaN(value)) return "—";
     const rounded = Math.round(value);
@@ -926,24 +777,15 @@ function formatPrice(value) {
     return `€${rounded}`;
 }
 
-/**
- * Build a curved SVG path from one country's centroid to another's.
- *
- * Two-endpoint quadratic bezier whose control point sits perpendicular
- * to the midpoint at 18% of the segment length, biased to the left so
- * opposing flows (A→B and B→A are never both drawn, but adjacent pairs
- * like CH→IT and AT→IT never overlap).
- *
- * Start and end points are inset by an "anchor gap" so the arrow does
- * not visually collide with the price label at the centroid.
- */
+// Quadratic bezier, control point left-of-travel at 18% of segment length so
+// adjacent flows (e.g. CH→IT and AT→IT) don't overlap. Endpoints inset by
+// GAP px so the arrow doesn't collide with the centroid price label.
 function flowPath([x1, y1], [x2, y2]) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const len = Math.hypot(dx, dy);
     if (len === 0) return "";
 
-    // Inset both endpoints by a fixed gap (in pixels) along the line.
     const GAP = 28;
     const ux = dx / len;
     const uy = dy / len;
@@ -952,8 +794,6 @@ function flowPath([x1, y1], [x2, y2]) {
     const ex = x2 - ux * GAP;
     const ey = y2 - uy * GAP;
 
-    // Perpendicular control point — curves the arrow to the left of the
-    // direction of travel. Curvature is a fraction of segment length.
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
     const CURVATURE = 0.18;
@@ -963,21 +803,12 @@ function flowPath([x1, y1], [x2, y2]) {
     return `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`;
 }
 
-/**
- * Map |price spread| in EUR/MWh to a pixel stroke width. Clamped to
- * the ARROW_MIN_WIDTH / ARROW_MAX_WIDTH range.
- */
 function widthForSpread(spread) {
     const t = Math.min(1, Math.max(0, spread / ARROW_WIDTH_PIVOT));
     return ARROW_MIN_WIDTH + t * (ARROW_MAX_WIDTH - ARROW_MIN_WIDTH);
 }
 
-/**
- * A zero-length path collapsed to a single point. Used as the start
- * state for entering flow arrows and the end state for exiting ones
- * so the `d` attribute can be tweened via d3.interpolateString
- * through a path of matching structure (`M x,y Q x,y x,y`).
- */
+// Matching "M _ Q _ _" structure lets d3.interpolateString tween cleanly.
 function degeneratePath([x, y]) {
     return `M${x},${y} Q${x},${y} ${x},${y}`;
 }

@@ -1,28 +1,20 @@
-// Interactive explorer.
-//
-// Binds the timeline scrubber to the map controller so the reader can
-// drag through the 24 hours of the showcase day and see the map update
-// live. Also handles play/pause (keyboard + button), keyboard
-// scrubbing via arrow keys, and a right-hand sidebar panel that shows
-// generation stack + daily profile + stats for the clicked country.
+// Timeline scrubber bound to the map, plus play/pause, keyboard scrubbing,
+// and a country sidebar.
 
 import { createGenerationStack } from "./charts/generation_stack.js";
 import { createDailyProfile } from "./charts/daily_profile.js";
 
 const HOURS = 24;
-const FOCUS_COUNTRY = "CH";   // Default sidebar subject — the protagonist
-const MS_PER_HOUR_BASE = 760; // Playback cadence at 1x — ~18s for the full day
-const VISIBILITY_THRESHOLD = 0.15; // How far into the explorer before it "activates"
-const INITIAL_HOUR = 0;       // Start at midnight — reader scrubs forward from calm baseline
+const FOCUS_COUNTRY = "CH";   // default sidebar subject — the protagonist
+const MS_PER_HOUR_BASE = 760; // 1x playback ≈ 18s for the full day
+const VISIBILITY_THRESHOLD = 0.15; // intersection ratio at which explorer "activates"
+const INITIAL_HOUR = 0;       // start at midnight so reader scrubs from a calm baseline
 
-// Scroll pause — when the explorer enters the viewport, page scroll
-// is blocked for a few seconds to draw the reader's attention to the
-// timeline. The lock releases automatically after the pause OR
-// immediately if the reader interacts with the timeline (drag, play,
-// keyboard). No scroll-jacking — the wheel never drives the timeline.
-// Skipped on touch devices.
-const SCROLL_PAUSE_DELAY_MS = 600;  // delay before the pause engages
-const SCROLL_PAUSE_DURATION_MS = 2000; // how long scroll is blocked
+// Brief scroll lock when the explorer enters view, to pull attention to the
+// timeline. Auto-releases after the duration, or immediately on any timeline
+// interaction. Skipped on touch — wheel is never used to drive the scrubber.
+const SCROLL_PAUSE_DELAY_MS = 600;
+const SCROLL_PAUSE_DURATION_MS = 2000;
 const IS_TOUCH = window.matchMedia("(pointer: coarse)").matches;
 
 const SELECTORS = {
@@ -54,8 +46,7 @@ export function initExplorer(config) {
     const readout = section.querySelector(SELECTORS.readout);
     if (!timeline || !track || !fill || !handle || !readout) return null;
 
-    // Render 24 ticks on the track, 1 per hour. Every 6 hours is a
-    // major tick. Also render hour labels (00, 06, 12, 18, 24).
+    // 24 hourly ticks, major every 6 hours, plus labels at 00/06/12/18/24.
     for (let h = 0; h <= HOURS; h++) {
         const tick = document.createElement("span");
         tick.className = "timeline__tick";
@@ -83,15 +74,12 @@ export function initExplorer(config) {
         speedMultiplier: 1,
     };
 
-    // Delay before the pulse hint fires once the reader has crossed
-    // into the explorer. Gives the intro headline time to land so
-    // the chrome doesn't steal attention from the copy.
+    // Pulse-hint delay: lets the intro headline land before the chrome pings.
     const HINT_DELAY_MS = 1600;
     let hintTimer = null;
 
-    // Purely visual sync of the fill bar, handle, readout, and aria.
-    // Does NOT touch the map — that happens only when the integer
-    // hour actually changes, to avoid spamming 800ms transitions.
+    // Visual-only: fill/handle/readout/aria. Skips the map so we don't spam
+    // 800ms transitions on every pointermove — map updates only on hour flip.
     function renderUI() {
         const frac = state.hourFloat / (HOURS - 1);
         const pct = Math.max(0, Math.min(100, frac * 100));
@@ -109,9 +97,7 @@ export function initExplorer(config) {
         }
     }
 
-    // Forward-declared sidebar state — initialized by the sidebar
-    // block near the end of initExplorer. Read by pushMap so the
-    // map focus tracks the sidebar's selected country.
+    // Hoisted so pushMap can read it — the sidebar block assigns it later.
     let sidebarActiveCountry = null;
 
     function pushMap(hour) {
@@ -119,7 +105,6 @@ export function initExplorer(config) {
             const focus = sidebarActiveCountry || FOCUS_COUNTRY;
             config.map.update({ hour, focusCountry: focus });
         }
-        // Keep sidebar stats in sync with timeline position.
         if (sidebarActiveCountry) {
             updateSidebarStats(sidebarActiveCountry, hour);
         }
@@ -140,8 +125,7 @@ export function initExplorer(config) {
             state.hour = clamped;
             pushMap(clamped);
         } else {
-            // Same hour — still push in case the map was in empty
-            // state (first interaction after explorer entry).
+            // Same hour: still push so the first interaction paints an empty map.
             pushMap(clamped);
         }
         renderUI();
@@ -149,7 +133,7 @@ export function initExplorer(config) {
 
     function play() {
         if (state.playing) return;
-        // If at the end, restart from midnight
+        // Restart from midnight if we're at the end.
         if (state.hourFloat >= HOURS - 1) {
             state.hourFloat = 0;
             state.hour = 0;
@@ -161,7 +145,7 @@ export function initExplorer(config) {
         playBtn?.setAttribute("aria-label", "Pause timeline");
         if (!state.started) {
             markStarted();
-            // Kick off at hour 0 for a clean "from the beginning" feel.
+            // First play always starts at hour 0 — cleaner than resuming mid-day.
             state.hourFloat = 0;
             state.hour = 0;
             pushMap(0);
@@ -182,9 +166,8 @@ export function initExplorer(config) {
                 pushMap(intHour);
             }
             renderUI();
-            // Auto-pause cleanly when we reach the end rather than
-            // wrapping back to midnight — the reader gets a definite
-            // "day is over" beat instead of an infinite loop.
+            // Pause at the end rather than looping — the reader gets a definite
+            // "day is over" beat instead of an infinite cycle.
             if (next >= HOURS - 1) {
                 pause();
                 return;
@@ -209,18 +192,14 @@ export function initExplorer(config) {
         if (state.playing) pause(); else play();
     }
 
-    // ---- First-encounter hint ----
-    // The timeline handle pulses gently the first time the reader
-    // sees the explorer, to signal that it's interactive. The pulse
-    // is a CSS-only animation triggered by the is-hinting class; it
-    // plays three times and then stops via a CSS `animation-iteration-count`
-    // of 3. The is-touched class kills it permanently the first time
-    // the reader actually interacts with the timeline.
+    // First-encounter handle pulse: the is-hinting class fires a CSS keyframe
+    // three times to signal interactivity. is-touched kills it permanently on
+    // any real interaction.
     let markTouched = () => {
         timeline.classList.add("is-touched");
         timeline.classList.remove("is-hinting");
-        // Also cancel any pending hint-delay timer so a late touch
-        // during the 1.6s delay doesn't produce a stale pulse.
+        // Cancel pending hint so a late touch during the 1.6s delay doesn't
+        // produce a stale pulse.
         if (hintTimer) {
             clearTimeout(hintTimer);
             hintTimer = null;
@@ -232,7 +211,6 @@ export function initExplorer(config) {
         togglePlay();
     });
 
-    // ---- Drag scrubbing ----
     let dragging = false;
     const pointerToHour = (event) => {
         const rect = track.getBoundingClientRect();
@@ -257,9 +235,8 @@ export function initExplorer(config) {
     track.addEventListener("pointercancel", endDrag);
     track.addEventListener("pointerleave", endDrag);
 
-    // ---- Keyboard ----
     track.addEventListener("keydown", (e) => {
-        // Any keyboard nudge counts as "touched" and silences the hint.
+        // Any nudge counts as "touched" and silences the hint.
         if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", " ", "Enter"].includes(e.key)) {
             markTouched();
         }
@@ -294,7 +271,6 @@ export function initExplorer(config) {
         }
     });
 
-    // ---- Color mode toggle (price / renewable %) ----
     const modeBtns = section.querySelectorAll("[data-mode]");
     modeBtns.forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -302,13 +278,12 @@ export function initExplorer(config) {
             modeBtns.forEach((b) => b.classList.toggle("is-active", b === btn));
             if (config.map?.update) {
                 config.map.update({ colorMode: mode });
-                // Re-push current hour so the fill repaints.
+                // Re-push current hour so the fill repaints under the new mode.
                 pushMap(state.hour);
             }
         });
     });
 
-    // ---- Speed control (1x / 2x / 4x) ----
     const speedBtns = section.querySelectorAll("[data-speed]");
     speedBtns.forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -318,10 +293,10 @@ export function initExplorer(config) {
         });
     });
 
-    // ---- Global spacebar play/pause when the explorer is in view ----
+    // Spacebar is only claimed while the explorer is in view so it doesn't
+    // hijack page scroll on the hero/narrative.
     document.addEventListener("keydown", (e) => {
         if (e.key !== " " || !state.active) return;
-        // Ignore if focus is in an input/textarea
         const t = e.target;
         if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
         e.preventDefault();
@@ -329,26 +304,22 @@ export function initExplorer(config) {
         togglePlay();
     });
 
-    // ---- Activation via IntersectionObserver ----
-    // We track whether the explorer is visible enough that spacebar
-    // should be claimed. Also used to auto-pause when the reader
-    // scrolls back up into the story.
+    // Tracks whether the explorer is visible enough to claim the spacebar,
+    // and auto-pauses playback on scroll-away.
     const observer = new IntersectionObserver(
         ([entry]) => {
             const wasActive = state.active;
             state.active = entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD;
 
             if (state.active && !wasActive) {
-                // First time entering — show the map at hour 0
-                // (midnight, calm baseline) so the reader sees content
-                // immediately rather than a confusing blank state.
+                // First entry: paint hour 0 so the reader sees content
+                // immediately instead of a blank map.
                 if (!state.started) {
                     pushMap(0);
                     timeline.classList.add("is-waiting");
                     section.classList.add("is-waiting");
                 }
             } else if (!state.active && wasActive) {
-                // Left the explorer view — auto-pause playback.
                 pause();
             }
         },
@@ -356,16 +327,9 @@ export function initExplorer(config) {
     );
     observer.observe(section);
 
-    // ---- Fixed chrome hiding + first-encounter hint trigger ----
-    //
-    // The timeline dock is native CSS sticky now (see style.css), so
-    // no JS opacity writes here. We only:
-    //   1. Toggle the map clock + HUD off when the reader is inside
-    //      the explorer (the timeline readout owns the hour display).
-    //   2. Add the `is-hinting` class the first time the timeline
-    //      becomes meaningfully visible, so the handle pulses three
-    //      times to signal interactivity. Cleared permanently the
-    //      first time the reader actually touches the timeline.
+    // Timeline dock is CSS-sticky (style.css), so this only (1) hides the map
+    // clock + HUD inside the explorer, since the timeline readout owns the
+    // hour, and (2) arms the first-encounter pulse hint.
     const mapClock = document.querySelector("[data-map-clock]");
     const hud = document.querySelector(".hud");
     let hintArmed = false;
@@ -373,9 +337,8 @@ export function initExplorer(config) {
     const updateChrome = () => {
         const sectionRect = section.getBoundingClientRect();
         const vh = window.innerHeight;
-        // "Meaningfully inside" = the explorer's top has risen to the
-        // upper third of the viewport. At that point the intro is
-        // fully visible and the sticky timeline is docked.
+        // "Meaningfully inside" = top has crossed the upper third; by then the
+        // intro is fully visible and the sticky timeline has docked.
         const inExplorer = sectionRect.top < vh * 0.55 && sectionRect.bottom > 0;
         if (mapClock) {
             mapClock.classList.toggle("is-hidden-by-explorer", inExplorer);
@@ -384,14 +347,11 @@ export function initExplorer(config) {
             hud.classList.toggle("is-hidden-by-explorer", inExplorer);
         }
 
-        // Arm the hint once when the reader crosses into the explorer.
-        // Delayed ~1.6s so the headline lands before the chrome pings.
-        // Skips silently if the timeline has already been touched.
+        // Arm the hint once on entry; delayed so the headline lands first.
         if (inExplorer && !hintArmed && !timeline.classList.contains("is-touched")) {
             hintArmed = true;
             hintTimer = setTimeout(() => {
-                // Guard: reader may have touched the timeline during
-                // the delay (e.g., pressed space). Check again.
+                // Re-check: reader may have touched (e.g. spacebar) during the delay.
                 if (!timeline.classList.contains("is-touched")) {
                     timeline.classList.add("is-hinting");
                 }
@@ -412,16 +372,9 @@ export function initExplorer(config) {
     window.addEventListener("scroll", scheduleChrome, { passive: true });
     window.addEventListener("resize", scheduleChrome);
 
-    // ---- Timeline fade-in synced to the headline ----
-    //
-    // Watch the explorer headline. When it crosses into the viewport
-    // (~30% visible), add `.is-visible` to the timeline wrap so the
-    // CSS opacity + transform transition fades the timeline up at the
-    // same beat the title appears. The reader perceives the title and
-    // the scrubber as appearing together as one composition.
-    //
-    // Once visible, stays visible for the lifetime of the page so
-    // scrolling back doesn't make the timeline blink.
+    // Timeline fades in at the same beat as the headline, so they register as
+    // one composition. Latched — never un-hides on scroll-back so the reader
+    // doesn't see it blink.
     const headlineEl = section.querySelector(".explorer__headline");
     if (headlineEl && timelineWrap) {
         const fadeObserver = new IntersectionObserver(
@@ -436,18 +389,7 @@ export function initExplorer(config) {
         fadeObserver.observe(headlineEl);
     }
 
-    // ---- Scroll pause ----
-    //
-    // A brief scroll freeze when the explorer enters the viewport.
-    // The page stops scrolling for ~3.5 seconds, drawing the reader's
-    // attention to the timeline and the "scroll to move through the
-    // day" prompt. The lock releases automatically after the pause,
-    // OR immediately if the reader interacts with the timeline
-    // (click play, drag, or keyboard). No scroll-jacking — the wheel
-    // never drives the timeline.
-    //
-    // Fires only once per page load so scrolling back through the
-    // explorer later is free.
+    // Fires once per page load. On scroll-back later, no re-lock.
     const scrollPause = { active: false, fired: false };
 
     if (!IS_TOUCH) {
@@ -457,8 +399,6 @@ export function initExplorer(config) {
         };
         document.addEventListener("wheel", onWheel, { passive: false });
 
-        // Release the pause — called by the auto-timer and by any
-        // timeline interaction (play, drag, keyboard).
         const releasePause = () => {
             scrollPause.active = false;
             section.classList.remove("is-scroll-locked");
@@ -466,32 +406,28 @@ export function initExplorer(config) {
             document.removeEventListener("wheel", onWheel);
         };
 
-        // Hook into markTouched so any timeline interaction releases.
+        // Wrap markTouched so any timeline interaction releases the lock.
         const origMarkTouched = markTouched;
         markTouched = () => {
             origMarkTouched();
             if (scrollPause.active) releasePause();
         };
 
-        // One-shot observer: pause scroll when the explorer first
-        // enters the viewport, then disconnect.
+        // One-shot: lock when the explorer enters, then disconnect.
         const pauseObserver = new IntersectionObserver(
             ([entry]) => {
                 if (!entry.isIntersecting || scrollPause.fired) return;
                 scrollPause.fired = true;
                 pauseObserver.disconnect();
 
-                // Brief delay so the reader finishes arriving.
                 setTimeout(() => {
-                    // Guard: reader may have already interacted or
-                    // scrolled away during the delay.
+                    // Re-check: reader may have already interacted or scrolled away.
                     const rect = section.getBoundingClientRect();
                     if (rect.top > window.innerHeight * 0.7 || rect.bottom < 0) return;
 
                     scrollPause.active = true;
                     section.classList.add("is-scroll-locked");
 
-                    // Auto-release after the pause duration.
                     setTimeout(() => {
                         if (scrollPause.active) releasePause();
                     }, SCROLL_PAUSE_DURATION_MS);
@@ -502,12 +438,6 @@ export function initExplorer(config) {
         pauseObserver.observe(section);
     }
 
-    // ---- Sidebar panel ----
-    //
-    // Click a country on the map to open a right-hand sidebar showing
-    // its generation stack and daily price profile for the current
-    // hour on the showcase day. The sidebar updates when the timeline
-    // moves and when the reader clicks a different country.
     const sidebar = document.querySelector("[data-sidebar]");
     if (sidebar) {
         sidebar.setAttribute("role", "dialog");
@@ -529,7 +459,7 @@ export function initExplorer(config) {
 
     let sidebarGenCtl = null;
     let sidebarProfileCtl = null;
-    // sidebarActiveCountry is declared above pushMap (line ~120).
+    // sidebarActiveCountry is hoisted above pushMap.
 
     function updateSidebarStats(countryCode, hour) {
         if (!showcase?.countries) return;
@@ -555,12 +485,10 @@ export function initExplorer(config) {
         sidebarActiveCountry = countryCode;
         if (sidebarCountry) sidebarCountry.textContent = COUNTRY_NAMES[countryCode] || countryCode;
 
-        // Update the map focus to this country.
         pushMap(state.hour);
 
         updateSidebarStats(countryCode, state.hour);
 
-        // Rebuild charts for the new country.
         if (sidebarGenCtl) { sidebarGenCtl.destroy(); sidebarGenCtl = null; }
         if (sidebarProfileCtl) { sidebarProfileCtl.destroy(); sidebarProfileCtl = null; }
 
@@ -589,7 +517,7 @@ export function initExplorer(config) {
         sidebar.classList.add("is-open");
         const mapClock = document.querySelector("[data-map-clock]");
         if (mapClock) mapClock.classList.add("is-hidden-by-sidebar");
-        // On mobile, mark background elements inert so focus stays in the sidebar
+        // Mobile: mark background inert so focus is trapped in the sidebar.
         if (window.innerWidth <= 900) {
             document.querySelectorAll(".scene__map, .scene__narrative, .explorer__intro, .explorer__timeline-wrap")
                 .forEach((el) => el.setAttribute("inert", ""));
@@ -603,16 +531,14 @@ export function initExplorer(config) {
         sidebar.classList.remove("is-open");
         const mapClock = document.querySelector("[data-map-clock]");
         if (mapClock) mapClock.classList.remove("is-hidden-by-sidebar");
-        // Remove inert from background elements
         document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
         sidebarActiveCountry = null;
-        // Reset focus to the default protagonist.
+        // Back to the default protagonist.
         pushMap(state.hour);
     }
 
-    // Wire country clicks + keyboard on the map. Paths carry
-    // tabindex=0 and role=button (set in map.js) so keyboard users
-    // reach them via Tab; Enter/Space mirror the click toggle.
+    // Paths are tabindex=0 + role=button (set in map.js) so Enter/Space mirror
+    // the click toggle for keyboard users.
     if (sidebar) {
         document.querySelectorAll(".country").forEach((el) => {
             const toggle = () => {
@@ -647,9 +573,7 @@ export function initExplorer(config) {
         });
     }
 
-    // Paint the initial UI state (handle at INITIAL_HOUR, readout set)
-    // without touching the map — the map only updates once the reader
-    // actually presses play or starts scrubbing.
+    // Paint initial UI only — map stays untouched until the reader interacts.
     renderUI();
 
     return {

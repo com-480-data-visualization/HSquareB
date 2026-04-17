@@ -1,16 +1,6 @@
-// Narrative scroll orchestration.
-//
-// Uses Scrollama to detect which narrative step is currently in view.
-// When a step enters the active zone, we:
-//   1. Toggle `.is-active` on the card (CSS handles the visual reveal)
-//   2. Notify the map controller so it can react (colors, flows, labels)
-//   3. Update the HUD timestamp / meta so the reader always knows which
-//      moment they are looking at.
-//
-// The "active zone" is 80% from the top of the viewport — the card
-// fires as soon as it's risen to 20% above the bottom edge. This
-// lights the map up earlier in the reader's field of view so the
-// colours never feel lagged behind the prose.
+// Scrollama drives step-in-view detection; each active step toggles the card,
+// updates the map, and refreshes the HUD. Active zone is 80% from the top so
+// the map lights up before the prose settles.
 
 import * as d3 from "d3";
 import scrollama from "scrollama";
@@ -29,7 +19,7 @@ const MAP_CLOCK_SELECTOR = "[data-map-clock]";
 const CLOCK_HOUR_SELECTOR = "[data-clock-hour]";
 const CLOCK_DATE_SELECTOR = "[data-clock-date]";
 const NARRATIVE_ACTIVE_CLASS = "is-narrative-active";
-const PEAK_HOUR = 13;  // Step 3 trough — clock gets accent-glow treatment
+const PEAK_HOUR = 13;  // Step 3 trough — clock gets accent-glow
 
 export function initNarrative(selector, config) {
     const container = document.querySelector(selector);
@@ -53,27 +43,20 @@ export function initNarrative(selector, config) {
     const clockHour = document.querySelector(CLOCK_HOUR_SELECTOR);
     const clockDate = document.querySelector(CLOCK_DATE_SELECTOR);
 
-    // Set up the leader-line overlay if the map exposes centroid lookup.
     const leaderCtl = (leaderOverlay && config.map?.getCountryCentroidPx)
         ? createLeaderController(leaderOverlay, config.map)
         : null;
 
-    // Render a small sparkline inside each step card, showing the full
-    // 24-hour price trajectory of that step's focus country with the
-    // current hour highlighted.
     if (config.showcase) {
         steps.forEach((step) => renderStepSparkline(step, config.showcase));
-        // Step 2 gets a small generation-mix donut for Germany at hour 10
-        // showing solar dominance. Rendered inside the same chart container
-        // as the sparkline, floated to the right.
+        // Step 2: DE gen-mix donut at hour 10, floated right of the sparkline.
         const step2 = container.querySelector('[data-step="2"]');
         if (step2) {
             renderGenDonut(step2, config.showcase, "DE", 10);
         }
     }
 
-    // Step 4 gets a calendar heatmap with a DE/CH toggle. Loaded
-    // lazily — the data may arrive after init via injectCalendarHeatmap.
+    // Step 4 heatmap loads lazily — data may arrive post-init via injectCalendarHeatmap.
     const heatmapContainer = container.querySelector('[data-step-chart="heatmap"]');
     function injectCalendarHeatmap(calendarData) {
         if (!heatmapContainer || !calendarData?.days?.length) return;
@@ -89,10 +72,7 @@ export function initNarrative(selector, config) {
         injectCalendarHeatmap(config.calendarData);
     }
 
-    // Step 5 gets a generation stack chart for Germany on the showcase
-    // day. The reveal animation fires when the step enters the active
-    // zone, so the stack sweeps open left-to-right as the reader
-    // arrives at the card.
+    // Step 5 gen-stack; reveal fires on step-enter so it sweeps open with the card.
     let genStackCtl = null;
     if (config.showcase) {
         const genContainer = container.querySelector('[data-step-chart="genstack"]');
@@ -108,10 +88,7 @@ export function initNarrative(selector, config) {
         }
     }
 
-    // Step 6 — duck curve: Germany's daily profile animated month by
-    // month. The ghost line shows the annual average while the active
-    // line morphs through each month's shape, revealing the deepening
-    // midday dip.
+    // Step 6 duck curve — DE monthly profile morphs over an annual-average ghost.
     let duckCtl = null;
     if (config.profilesData?.countries?.DE) {
         const duckContainer = container.querySelector('[data-step-chart="duck"]');
@@ -126,8 +103,7 @@ export function initNarrative(selector, config) {
         }
     }
 
-    // Step 7 — small multiples: compact daily profiles for all 5
-    // countries, showing their annual-average shape side by side.
+    // Step 7 small multiples — annual-average profile per country.
     if (config.profilesData?.countries) {
         const multiContainer = container.querySelector('[data-step-chart="multiples"]');
         if (multiContainer) {
@@ -151,8 +127,7 @@ export function initNarrative(selector, config) {
         }
     }
 
-    // Render chapter ticks on the progress bar — one per step, positioned
-    // at the scroll fraction corresponding to that step's centre.
+    // Chapter ticks positioned at the scroll fraction of each step's centre.
     if (progressTicks && steps.length > 1) {
         progressTicks.replaceChildren();
         const layoutTicks = () => {
@@ -183,14 +158,11 @@ export function initNarrative(selector, config) {
             progress: false,
         })
         .onStepEnter(({ element, index }) => {
-            // Mark the active step and clear any previously active.
             steps.forEach((s) => s.classList.toggle("is-active", s === element));
 
-            // Tell the map to desaturate — the CSS rule on the map SVG
-            // filter reacts to this class on <body>.
+            // Body class gates the map's desaturation filter in CSS.
             document.body.classList.add(NARRATIVE_ACTIVE_CLASS);
 
-            // Update the HUD with this step's metadata.
             if (hud && hud.classList.contains("is-visible") === false) {
                 hud.classList.add("is-visible");
             }
@@ -201,26 +173,20 @@ export function initNarrative(selector, config) {
                 hudMeta.textContent = element.dataset.meta || "";
             }
 
-            // Update the big on-map clock. Parses the step's data-hour
-            // and data-timestamp to populate the display-sized digits,
-            // animates the digit reveal via a re-triggered CSS animation
-            // on class toggle, and flags the peak-hour state so the
-            // digits glow ice-white at the moment of the shock.
             if (mapClock) {
                 mapClock.classList.add("is-visible");
                 const hour = Number(element.dataset.hour);
                 const isPeak = hour === PEAK_HOUR;
                 mapClock.classList.toggle("is-peak", isPeak);
                 if (clockHour && Number.isFinite(hour)) {
-                    // Trigger the CSS keyframe on every change by
-                    // removing and re-adding the animation via a reflow.
+                    // Force reflow to re-fire the CSS keyframe on every change.
                     clockHour.textContent = String(hour).padStart(2, "0");
                     clockHour.style.animation = "none";
                     void clockHour.offsetWidth;
                     clockHour.style.animation = "";
                 }
                 if (clockDate && element.dataset.timestamp) {
-                    // Extract the date portion from "2024-05-12 13:00 CET"
+                    // "2024-05-12 13:00 CET" → date portion only.
                     const datePart = element.dataset.timestamp.split(" ")[0];
                     if (datePart) {
                         clockDate.textContent = datePart.replace(/-/g, " · ");
@@ -228,14 +194,10 @@ export function initNarrative(selector, config) {
                 }
             }
 
-            // Draw a leader line from the active card to its target country.
             if (leaderCtl) {
                 leaderCtl.show(element);
             }
 
-            // Push state to the map: fill each country with its price
-            // color at this hour and set the focus country (the card's
-            // target) to receive the large glowing label treatment.
             if (config.map && typeof config.map.update === "function") {
                 const hour = Number(element.dataset.hour);
                 const focusCountry = element.dataset.country || null;
@@ -250,12 +212,10 @@ export function initNarrative(selector, config) {
                 });
             }
 
-            // Trigger generation-stack reveal when Step 5 enters.
             if (element.dataset.step === "5" && genStackCtl) {
                 genStackCtl.reveal();
             }
 
-            // Trigger duck-curve month animation when Step 6 enters.
             if (element.dataset.step === "6" && duckCtl) {
                 const months = Object.keys(
                     config.profilesData?.countries?.DE?.monthly || {},
@@ -264,20 +224,16 @@ export function initNarrative(selector, config) {
             }
         })
         .onStepExit(({ element, direction }) => {
-            // Always deactivate the exiting step's card. The entering
-            // step's onStepEnter also does this, but for fast/jump
-            // scrolls the enter might not fire synchronously with
-            // the exit, leaving two cards visually "on" at once.
+            // Fast scrolls can desync enter/exit — clear here too so two cards
+            // never stay active at once.
             element.classList.remove("is-active");
 
-            // Stop duck-curve animation when Step 6 exits to avoid
-            // the setInterval leaking while the reader scrolls away.
+            // Prevent setInterval leak when reader scrolls past step 6.
             if (element.dataset.step === "6" && duckCtl) {
                 duckCtl.stopAnimation();
             }
 
-            // When scrolling UP past the first step, full cleanup —
-            // hide HUD, clock, leader, reset the map to dark base.
+            // Scrolled up past step 1: full chrome cleanup.
             if (direction === "up" && element === steps[0]) {
                 document.body.classList.remove(NARRATIVE_ACTIVE_CLASS);
                 if (hud) hud.classList.remove("is-visible");
@@ -295,24 +251,18 @@ export function initNarrative(selector, config) {
                 }
             }
 
-            // When scrolling DOWN past the last step, release the
-            // desaturation so the explorer below gets a vivid map,
-            // but keep the clock visible as the reader transitions.
+            // Scrolled down past final step: drop desaturation so the explorer
+            // below gets a vivid map; clock stays for continuity.
             if (direction === "down" && element === steps[steps.length - 1]) {
                 document.body.classList.remove(NARRATIVE_ACTIVE_CLASS);
                 if (leaderCtl) leaderCtl.hide();
             }
         });
 
-    // Jump-scroll safety net — Scrollama uses IntersectionObserver,
-    // which evaluates only the final viewport state after a scroll.
-    // If the reader jumps from the explorer (or any deep position)
-    // straight to y=0, Step 1 never crosses a threshold, onStepExit
-    // never fires, and the HUD / clock stay visible over the hero.
-    // This lightweight scroll check detects "we're at the very top
-    // AND the HUD is still visible" and forces the full cleanup.
-    // Once cleaned up the guard (`hud.classList.contains("is-visible")`)
-    // prevents redundant work on subsequent scroll events.
+    // IntersectionObserver only evaluates final scroll state, so jumping from
+    // deep in the page straight to y=0 skips step 1's threshold and leaves
+    // HUD/clock stuck over the hero. Force cleanup when we land at the top
+    // with chrome still visible; the is-visible guard avoids redundant work.
     const checkScrollReset = () => {
         if (window.scrollY > 120) return;
         if (!hud?.classList.contains("is-visible")) return;
@@ -330,7 +280,7 @@ export function initNarrative(selector, config) {
     };
     window.addEventListener("scroll", checkScrollReset, { passive: true });
 
-    // Global scroll progress → the 2px bar at the top of the viewport.
+    // Global scroll progress bar.
     if (progressBar) {
         const updateProgress = () => {
             const max = document.documentElement.scrollHeight - window.innerHeight;
@@ -342,10 +292,8 @@ export function initNarrative(selector, config) {
         window.addEventListener("scroll", updateProgress, { passive: true });
     }
 
-    // Resize handling — scrollama needs to recompute offsets when the
-    // viewport changes or when fonts load in and shift layout. The
-    // leader line also needs to redraw because card and country
-    // positions both depend on viewport geometry.
+    // Scrollama recomputes offsets on resize / font-load; leader geometry
+    // depends on viewport too.
     const onResize = () => {
         scroller.resize();
         if (leaderCtl) leaderCtl.redraw();
@@ -356,8 +304,7 @@ export function initNarrative(selector, config) {
         if (leaderCtl) leaderCtl.redraw();
     });
 
-    // The cards translate as the page scrolls, so the leader line's
-    // origin point shifts continuously. Cheap rAF redraw on scroll.
+    // Cards translate during scroll, so the leader's origin moves every frame.
     if (leaderCtl) {
         let leaderTicking = false;
         window.addEventListener("scroll", () => {
@@ -378,29 +325,10 @@ export function initNarrative(selector, config) {
 }
 
 
-/**
- * Leader line controller — draws a physical line from the active
- * narrative card to the country it is talking about.
- *
- * Motion model
- * ------------
- * The leader has three control points: (start, elbow, dest). Each
- * point is tracked as a critical-damped spring whose target moves
- * when the active step changes or when scroll displaces the card.
- * Every frame we advance all six spring axes by a fixed dt, producing
- * a line that *chases* its target with a natural follow-through,
- * never snapping.
- *
- * The dest circle (the target dot on the country) uses the same
- * springs, so the dot glides across the map from one country to the
- * next on step change and the line + dot stay perfectly in phase.
- *
- * Visibility
- * ----------
- * Springs keep running as long as the loop is active, even when the
- * line is hidden — on the next show() the springs are re-initialised
- * at the current target so the reveal doesn't inherit stale state.
- */
+// Leader line from the active card to its target country. Three control points
+// (start, elbow, dest) are each a critical-damped spring integrated every
+// frame, so the line chases its target smoothly instead of snapping. The
+// target dot shares the same springs to stay in phase with the line.
 function createLeaderController(svgEl, mapCtl) {
     const NS = "http://www.w3.org/2000/svg";
     const line = document.createElementNS(NS, "path");
@@ -414,15 +342,12 @@ function createLeaderController(svgEl, mapCtl) {
 
     svgEl.append(line, pulseEl, dotEl);
 
-    // Critical-damped spring constants. Tuned by feel — stiffness 170
-    // + damping 24 gives ~500ms to land with zero overshoot, matches
-    // iOS default system spring.
+    // 170/24 ≈ iOS system spring: ~500ms settle, zero overshoot.
     const SPRING_STIFFNESS = 170;
     const SPRING_DAMPING = 24;
     const SPRING_EPSILON = 0.03;   // stop condition in pixels
-    const MAX_DT = 1 / 30;         // clamp step to 30fps worst case
+    const MAX_DT = 1 / 30;         // clamp to 30fps so stalls don't explode
 
-    // Each spring axis has a current position and velocity.
     const springs = {
         startX: { current: 0, target: 0, velocity: 0 },
         startY: { current: 0, target: 0, velocity: 0 },
@@ -437,11 +362,8 @@ function createLeaderController(svgEl, mapCtl) {
     let rafHandle = null;
     let lastFrameTime = null;
 
-    /**
-     * Compute the desired (start, elbow, dest) for the current step
-     * and write them to the spring targets. Does NOT touch `current`
-     * so the animation continues from wherever the line actually is.
-     */
+    // Writes spring targets only — `current` keeps its position so the line
+    // animates from wherever it actually is.
     function computeTargets() {
         if (!activeStep) return false;
         const iso = activeStep.dataset.country;
@@ -451,15 +373,13 @@ function createLeaderController(svgEl, mapCtl) {
 
         const cardRect = activeStep.getBoundingClientRect();
         const vh = window.innerHeight;
-        // Card has scrolled entirely off-viewport — don't update
-        // targets so the leader fades out gracefully rather than
-        // stretching to chase a card 2000px above or below.
+        // Card off-viewport: skip target update so the leader fades rather
+        // than stretching to chase a card 2000px away.
         if (cardRect.bottom < -30 || cardRect.top > vh + 30) {
             return false;
         }
 
-        // Read the headline anchor first so we can derive startY even
-        // when the card itself happens to be vertically clipped.
+        // Anchor to the headline so startY survives vertical card clipping.
         const headline = activeStep.querySelector(".step__headline");
         const headlineRect = headline
             ? headline.getBoundingClientRect()
@@ -470,9 +390,8 @@ function createLeaderController(svgEl, mapCtl) {
         const startX = cardRect.right + 8;
         const startY = yAnchor;
 
-        // Elbow geometry — horizontal stub from the card, scaled by
-        // distance, with the vertical drop deferred to the diagonal
-        // second segment.
+        // Horizontal stub off the card; the diagonal second segment carries
+        // the vertical drop.
         const stubLen = Math.min(48, Math.max(16, (dest.x - startX) * 0.18));
         const elbowX = startX + stubLen;
         const elbowY = startY;
@@ -486,7 +405,6 @@ function createLeaderController(svgEl, mapCtl) {
         return true;
     }
 
-    /** Snap all current positions to their target (no motion). */
     function snapToTarget() {
         for (const k in springs) {
             springs[k].current = springs[k].target;
@@ -494,13 +412,12 @@ function createLeaderController(svgEl, mapCtl) {
         }
     }
 
-    /** Step every spring forward by `dt` seconds. */
     function stepSprings(dt) {
         let moving = false;
         for (const k in springs) {
             const s = springs[k];
             const delta = s.target - s.current;
-            // Critical-damped spring integrator (semi-implicit Euler).
+            // Semi-implicit Euler integration.
             const spring = delta * SPRING_STIFFNESS;
             const damper = s.velocity * SPRING_DAMPING;
             const accel = spring - damper;
@@ -509,7 +426,6 @@ function createLeaderController(svgEl, mapCtl) {
             if (Math.abs(delta) > SPRING_EPSILON || Math.abs(s.velocity) > SPRING_EPSILON) {
                 moving = true;
             } else {
-                // Settle exactly.
                 s.current = s.target;
                 s.velocity = 0;
             }
@@ -517,7 +433,6 @@ function createLeaderController(svgEl, mapCtl) {
         return moving;
     }
 
-    /** Paint the current spring positions to the DOM. */
     function paint() {
         const sX = springs.startX.current;
         const sY = springs.startY.current;
@@ -534,7 +449,6 @@ function createLeaderController(svgEl, mapCtl) {
 
     let wasOffscreen = false;
 
-    /** The continuous loop. Runs while the leader is visible. */
     function tick(now) {
         rafHandle = null;
         if (!visible) return;
@@ -544,10 +458,8 @@ function createLeaderController(svgEl, mapCtl) {
             : Math.min(MAX_DT, (now - lastFrameTime) / 1000);
         lastFrameTime = now;
 
-        // Recompute targets (the card may have moved since last frame
-        // due to page scroll). If the step moved off-screen this
-        // returns false and we fade the leader out. When the card
-        // scrolls back into view it returns true and we restore it.
+        // Targets may have moved via scroll; false means card is off-viewport
+        // so we fade rather than stretching.
         const onscreen = computeTargets();
         if (onscreen !== !wasOffscreen) {
             wasOffscreen = !onscreen;
@@ -559,9 +471,8 @@ function createLeaderController(svgEl, mapCtl) {
         const moving = stepSprings(dt);
         paint();
 
-        // Always schedule the next frame while visible — even once
-        // settled — so scroll-driven target updates are picked up
-        // immediately. Cost is trivial (no DOM work when settled).
+        // Keep ticking while visible — scroll can shift targets even after the
+        // spring settles. Near-zero cost when nothing moves.
         if (visible) {
             rafHandle = requestAnimationFrame(tick);
         }
@@ -594,8 +505,7 @@ function createLeaderController(svgEl, mapCtl) {
 
         const gotTargets = computeTargets();
 
-        // When reduced motion is preferred, snap directly to the
-        // target on every step (no spring animation, no rAF loop).
+        // Reduced-motion: snap directly, no spring, no rAF.
         if (prefersReducedMotion || (firstShow && gotTargets)) {
             snapToTarget();
         }
@@ -614,9 +524,7 @@ function createLeaderController(svgEl, mapCtl) {
         stopLoop();
     }
 
-    /** External redraw trigger. The loop picks up the new target on
-     *  its next frame; if the loop is not running we schedule one
-     *  frame to re-paint. */
+    // External poke — the loop picks up new targets next frame; if idle, kick it.
     function redraw() {
         if (!visible) return;
         if (rafHandle == null) startLoop();
@@ -626,21 +534,11 @@ function createLeaderController(svgEl, mapCtl) {
 }
 
 
-/**
- * Render an in-card sparkline of the showcase day's hourly price curve
- * for the step's focus country, with a filled zero line, the current
- * hour highlighted as a bright dot, and the labelled endpoints.
- *
- * The chart is 100% intentional visual — it serves two roles:
- *   1. gives the reader peripheral context ("you are HERE in a 24h arc")
- *   2. previews the dramatic drop that the story is about to tell
- */
 function renderStepSparkline(stepEl, showcase) {
     const target = stepEl.querySelector("[data-step-chart]");
     if (!target) return;
-    // Steps whose chart container has a custom type (heatmap, genstack)
-    // are populated by their own dedicated component — skip them here
-    // to avoid orphaned sparkline SVGs buried under the real chart.
+    // Typed containers (heatmap, genstack) have their own renderer — skip
+    // so we don't bury a stray sparkline under the real chart.
     const chartType = target.getAttribute("data-step-chart");
     if (chartType && chartType !== "true" && chartType !== "") return;
 
@@ -655,7 +553,7 @@ function renderStepSparkline(stepEl, showcase) {
 
     const x = d3.scaleLinear().domain([0, 23]).range([padding.left, width - padding.right]);
     const yExtent = d3.extent(series, (d) => d.price);
-    // Pad the y range so extremes don't graze the top/bottom edges.
+    // Pad so extremes don't graze the edges.
     const yPad = Math.max(10, (yExtent[1] - yExtent[0]) * 0.08);
     const y = d3
         .scaleLinear()
@@ -669,7 +567,7 @@ function renderStepSparkline(stepEl, showcase) {
         .attr("preserveAspectRatio", "none")
         .attr("class", "spark");
 
-    // Zero line — a dashed reference for the price-negative threshold.
+    // Dashed zero reference when prices go negative.
     if (y.domain()[0] < 0) {
         svg.append("line")
             .attr("class", "spark__zero")
@@ -679,8 +577,6 @@ function renderStepSparkline(stepEl, showcase) {
             .attr("y2", y(0));
     }
 
-    // Area fill under the curve — a gradient that leans cyan when the
-    // trace dives below zero.
     const areaGen = d3
         .area()
         .x((d) => x(d.hour))
@@ -693,7 +589,6 @@ function renderStepSparkline(stepEl, showcase) {
         .attr("class", "spark__area")
         .attr("d", areaGen);
 
-    // Line — the actual trajectory.
     const lineGen = d3
         .line()
         .x((d) => x(d.hour))
@@ -705,12 +600,10 @@ function renderStepSparkline(stepEl, showcase) {
         .attr("class", "spark__line")
         .attr("d", lineGen);
 
-    // Focus marker — the current hour, rendered as a glowing dot.
     const focusPoint = series[focusHour];
     if (focusPoint) {
         const fx = x(focusPoint.hour);
         const fy = y(focusPoint.price);
-        // Vertical indicator rule dropped from the dot down to the x-axis
         svg.append("line")
             .attr("class", "spark__indicator")
             .attr("x1", fx).attr("x2", fx)
@@ -720,7 +613,6 @@ function renderStepSparkline(stepEl, showcase) {
             .attr("cx", fx).attr("cy", fy).attr("r", 3.5);
     }
 
-    // Axis anchors — just the 00 and 23 hour labels for context, no ticks.
     svg.append("text")
         .attr("class", "spark__anchor")
         .attr("x", padding.left).attr("y", height - 2)
@@ -731,7 +623,6 @@ function renderStepSparkline(stepEl, showcase) {
         .attr("x", width - padding.right).attr("y", height - 2)
         .attr("text-anchor", "end")
         .text("23");
-    // Country label on the left edge, near the top of the card's chart
     svg.append("text")
         .attr("class", "spark__country")
         .attr("x", padding.left)
@@ -741,11 +632,6 @@ function renderStepSparkline(stepEl, showcase) {
 }
 
 
-/**
- * Render a small generation-mix donut inside a step card, showing the
- * proportional breakdown of solar/wind/hydro/nuclear/gas at a specific
- * hour. Used on Step 2 to visually reinforce "solar is dominating."
- */
 function renderGenDonut(stepEl, showcase, country, hour) {
     const target = stepEl.querySelector("[data-step-chart]");
     if (!target) return;
@@ -794,7 +680,7 @@ function renderGenDonut(stepEl, showcase, country, hour) {
         .attr("fill", (d) => d.data.color)
         .attr("fill-opacity", 0.85);
 
-    // Center label — the dominant source percentage.
+    // Centre label shows the dominant source percentage.
     const dominant = slices.reduce((a, b) => (a.value > b.value ? a : b));
     const pct = Math.round((dominant.value / total) * 100);
     g.append("text")

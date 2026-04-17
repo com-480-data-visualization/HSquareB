@@ -1,17 +1,4 @@
-// Calendar heatmap — renders a dense hour × day grid of electricity
-// prices for one or two countries with a tab toggle. Canvas-backed
-// for performance (~13K cells per country). D3 scales drive the
-// layout maths; thin DOM elements handle the axes and tooltip.
-//
-// Usage:
-//   const hm = createCalendarHeatmap("#container", {
-//       data,                         // calendar_heatmap.json object
-//       countries: [                  // one or two entries
-//           { code: "DE", label: "Germany — 846 negative hours" },
-//           { code: "CH", label: "Switzerland — 529 negative hours" },
-//       ],
-//   });
-//   hm.destroy();
+// Hour x day price heatmap, canvas-backed for ~13K cells per country.
 
 import { priceContinuous } from "../utils/colors.js";
 
@@ -42,16 +29,13 @@ export function createCalendarHeatmap(selector, config) {
         return { el: empty, switchTo: () => {}, destroy: () => empty.remove() };
     }
 
-    // Responsive cell width: use narrower cells on small containers
     const containerWidth = container.getBoundingClientRect?.().width || 400;
     const CELL_W = containerWidth < 360 ? CELL_W_NARROW : CELL_W_DEFAULT;
 
-    // Wrapper div for the whole component (tabs + chart).
     const wrapper = document.createElement("div");
     wrapper.className = "cal-heatmap";
     wrapper.style.position = "relative";
 
-    // Tab bar (only rendered when there are 2+ countries).
     let activeIdx = 0;
     const tabs = [];
     if (countries.length > 1) {
@@ -71,21 +55,17 @@ export function createCalendarHeatmap(selector, config) {
         wrapper.appendChild(tabBar);
     }
 
-    // Title line — updates when switching countries.
     const titleEl = document.createElement("p");
     titleEl.className = "cal-heatmap__title mono";
     titleEl.textContent = countries[0].label;
     wrapper.appendChild(titleEl);
 
-    // Chart holder — contains canvas + overlays, swapped on toggle.
     const chartHolder = document.createElement("div");
     chartHolder.className = "cal-heatmap__holder";
     wrapper.appendChild(chartHolder);
 
-    // Pre-build chart data for each country once.
     const chartDataByIdx = countries.map((c) => prepareChartData(data, c.code));
 
-    // Render the first country.
     let currentChart = null;
     function switchTo(idx) {
         if (currentChart) currentChart.teardown();
@@ -126,7 +106,6 @@ function prepareChartData(data, country) {
 
 function renderChart(holder, chartData, country) {
     const { days, months, gridH } = chartData;
-    // Remove any previous children cleanly.
     while (holder.firstChild) holder.removeChild(holder.firstChild);
 
     const gridW = 24 * CELL_W;
@@ -135,7 +114,6 @@ function renderChart(holder, chartData, country) {
 
     holder.style.width = `${totalW}px`;
 
-    // Canvas
     const dpr = window.devicePixelRatio || 1;
     const canvas = document.createElement("canvas");
     canvas.className = "cal-heatmap__canvas";
@@ -163,7 +141,6 @@ function renderChart(holder, chartData, country) {
         }
     }
 
-    // Hour labels (top)
     const hourRow = document.createElement("div");
     hourRow.className = "cal-heatmap__hours mono";
     hourRow.style.left = `${MARGIN.left}px`;
@@ -177,7 +154,6 @@ function renderChart(holder, chartData, country) {
     }
     holder.appendChild(hourRow);
 
-    // Month labels (left)
     const monthCol = document.createElement("div");
     monthCol.className = "cal-heatmap__months mono";
     monthCol.style.top = `${MARGIN.top}px`;
@@ -191,7 +167,6 @@ function renderChart(holder, chartData, country) {
     }
     holder.appendChild(monthCol);
 
-    // Tooltip
     const tip = document.createElement("div");
     tip.className = "cal-heatmap__tip mono";
     tip.style.display = "none";
@@ -206,6 +181,7 @@ function renderChart(holder, chartData, country) {
             return;
         }
         const hour = Math.min(23, Math.floor(mx / CELL_W));
+        // Binary search — days have variable yOffset due to month gaps.
         let lo = 0;
         let hi = days.length - 1;
         let dayIdx = -1;
@@ -233,7 +209,6 @@ function renderChart(holder, chartData, country) {
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerleave", () => { tip.style.display = "none"; });
 
-    // Color legend — horizontal gradient bar explaining the price scale
     const legendEl = document.createElement("div");
     legendEl.className = "cal-heatmap__legend mono";
     const gradientBar = document.createElement("div");

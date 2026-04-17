@@ -1,7 +1,4 @@
-// Fetches a preprocessed JSON artefact from the site's data directory.
-//
-// Processed JSON lives at `docs/data/processed/` so GitHub Pages can serve
-// the site and its data from a single root folder.
+// Processed JSON sits under docs/ so GitHub Pages serves site + data from one root.
 
 const BASE_PATH = "data/processed/";
 

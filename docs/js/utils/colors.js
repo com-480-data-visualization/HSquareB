@@ -1,17 +1,15 @@
-// Color tokens from the design system.
-// Any change here must also update `docs/css/style.css` `:root` variables
-// and vice versa — keep the two in sync.
+// Keep these in sync with the :root CSS variables in docs/css/style.css.
 
 import * as d3 from "d3";
 
 export const PRICE_STOPS = [
     { max: -100, color: "#e0f7ff" },   // ice-white glow — peak drama
-    { max: -50,  color: "#67e8f9" },   // bright cyan
-    { max: 0,    color: "#22d3ee" },   // accent cyan
+    { max: -50,  color: "#67e8f9" },
+    { max: 0,    color: "#22d3ee" },
     { max: 50,   color: "#475569" },   // neutral slate — boring baseline
-    { max: 100,  color: "#fb923c" },   // muted orange
-    { max: 200,  color: "#ef4444" },   // red
-    { max: Infinity, color: "#991b1b" }, // deep red
+    { max: 100,  color: "#fb923c" },
+    { max: 200,  color: "#ef4444" },
+    { max: Infinity, color: "#991b1b" },
 ];
 
 export function priceColor(price) {
@@ -22,31 +20,26 @@ export function priceColor(price) {
     return PRICE_STOPS[PRICE_STOPS.length - 1].color;
 }
 
-// Continuous interpolated price scale — for dense grids (calendar
-// heatmaps) where the stepped priceColor produces visible banding.
-// Uses the same semantic endpoints as PRICE_STOPS but interpolates
-// between them via d3.scaleLinear + d3.interpolateRgb. Import d3
-// lazily to keep this file synchronous for other consumers.
+// Interpolated variant — stepped priceColor bands visibly in dense grids like
+// the calendar heatmap, so we interpolate the same semantic stops instead.
 let _continuousScale = null;
 
 export function priceContinuous(price) {
     if (price == null || Number.isNaN(price)) return "#1c2235";
     if (!_continuousScale) {
-        // Defer d3 import until first call — avoids import-order
-        // issues with the static ESM import map.
         const { scaleLinear, interpolateRgb } = d3;
-        if (!scaleLinear) return priceColor(price); // fallback
+        if (!scaleLinear) return priceColor(price);
         _continuousScale = scaleLinear()
             .domain([-200, -100, -50, 0, 40, 75, 150, 300])
             .range([
                 "#e0f7ff",   // ice-white extreme negative
-                "#67e8f9",   // bright cyan
-                "#22d3ee",   // accent cyan
-                "#0e7490",   // dark cyan (zero-crossing, negative side)
-                "#78716c",   // warm stone (baseline ~40 EUR)
-                "#e8a460",   // warm amber (visible from ~75 EUR)
-                "#ef4444",   // red (expensive)
-                "#991b1b",   // deep red
+                "#67e8f9",
+                "#22d3ee",
+                "#0e7490",   // dark cyan on the negative side of zero
+                "#78716c",   // warm stone baseline (~40 EUR)
+                "#e8a460",
+                "#ef4444",
+                "#991b1b",
             ])
             .interpolate(interpolateRgb)
             .clamp(true);
@@ -54,7 +47,6 @@ export function priceContinuous(price) {
     return _continuousScale(price);
 }
 
-// Renewable share scale — green gradient from 0% to 100%.
 let _renewableScale = null;
 
 export function renewableColor(share) {
@@ -71,10 +63,8 @@ export function renewableColor(share) {
     return _renewableScale(share);
 }
 
-// Renewable amount scale — absolute MW, so the map shows WHO produces
-// the most renewables rather than what fraction of their own mix it is.
-// Germany at ~45 GW dwarfs Switzerland at ~4 GW even though both have
-// high renewable shares.
+// Absolute MW, not share — the map should highlight Germany's ~45 GW, not
+// hide it behind Switzerland's high-but-tiny renewable fraction.
 let _renewableAmountScale = null;
 
 export function renewableAmountColor(mw) {

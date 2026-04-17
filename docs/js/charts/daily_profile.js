@@ -1,21 +1,5 @@
-// Daily profile chart — a 24-hour line chart showing the average
-// hourly price profile for a country. Supports:
-//   - Monthly animation (Step 6 duck curve)
-//   - Ghost overlay of the annual average or a comparison month
-//   - Small-multiple mode for Step 7 (compact, no axes)
-//
-// Usage:
-//   const dp = createDailyProfile("#container", {
-//       profiles,       // the country object from daily_profiles.json
-//       country: "DE",
-//       label: "Germany",
-//       compact: false,  // true = small-multiple mode
-//       width: 380,
-//       height: 200,
-//   });
-//   dp.setMonth("2024-05");
-//   dp.animateMonths(months, intervalMs);
-//   dp.destroy();
+// 24-hour price profile. Supports monthly animation, ghost overlay of
+// the annual average, and a compact small-multiple mode (no axes).
 
 import * as d3 from "d3";
 
@@ -74,10 +58,9 @@ export function createDailyProfile(selector, config) {
     const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Scales
     const x = d3.scaleLinear().domain([0, 23]).range([0, innerW]);
 
-    // Compute global y extent across all months + annual for stable axis.
+    // Global y extent across all months + annual keeps axis stable during animation.
     let yMin = Infinity;
     let yMax = -Infinity;
     for (const v of profiles.annual_average) {
@@ -95,7 +78,6 @@ export function createDailyProfile(selector, config) {
         .domain([yMin - yPad, yMax + yPad])
         .range([innerH, 0]);
 
-    // Zero line
     if (y.domain()[0] < 0 && y.domain()[1] > 0) {
         g.append("line")
             .attr("class", "daily-profile__zero")
@@ -114,25 +96,22 @@ export function createDailyProfile(selector, config) {
         .y1((d) => y(d))
         .curve(d3.curveMonotoneX);
 
-    // Ghost line (annual average) — always visible as reference.
+    // Annual average stays as ghost reference behind the active month.
     g.append("path")
         .datum(profiles.annual_average)
         .attr("class", "daily-profile__ghost")
         .attr("d", lineGen);
 
-    // Active area fill
     const activeFill = g.append("path")
         .attr("class", "daily-profile__area")
         .datum(profiles.annual_average)
         .attr("d", areaGen);
 
-    // Active line
     const activeLine = g.append("path")
         .attr("class", "daily-profile__line")
         .datum(profiles.annual_average)
         .attr("d", lineGen);
 
-    // Month label (top-right corner of chart area)
     const monthLabel = g.append("text")
         .attr("class", "daily-profile__month-label")
         .attr("x", innerW)
@@ -141,7 +120,6 @@ export function createDailyProfile(selector, config) {
         .attr("dy", "0.35em")
         .text("Annual avg");
 
-    // Axes (full mode only)
     if (!compact) {
         const xAxis = g.append("g")
             .attr("class", "daily-profile__axis")
@@ -174,7 +152,6 @@ export function createDailyProfile(selector, config) {
             .attr("y", -8)
             .text("€/MWh");
     } else {
-        // Compact: just country code label at bottom-center
         g.append("text")
             .attr("class", "daily-profile__country-label")
             .attr("x", innerW / 2)
@@ -185,7 +162,6 @@ export function createDailyProfile(selector, config) {
 
     let currentMonth = null;
 
-    // Hover crosshair + tooltip (full mode only)
     if (!compact) {
         wrapper.style.position = "relative";
 

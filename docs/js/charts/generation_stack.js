@@ -1,15 +1,5 @@
-// Generation stack chart — stacked area showing hourly generation by
-// source for one country on one day, with a price line overlay on a
-// secondary y-axis and a dashed total-load reference line.
-//
-// Usage:
-//   const gs = createGenerationStack("#container", {
-//       series,     // array of 24 hourly records from showcase_day.json
-//       country,    // ISO code (for the title)
-//       label,      // display label e.g. "Germany — 12 May 2024"
-//   });
-//   gs.reveal();   // animate the clip-path open
-//   gs.destroy();
+// Stacked hourly generation by source, with price line on a secondary
+// y-axis and a dashed total-load reference.
 
 import * as d3 from "d3";
 import { GENERATION_COLORS } from "../utils/colors.js";
@@ -20,8 +10,7 @@ const HEIGHT = 240;
 const INNER_W = WIDTH - MARGIN.left - MARGIN.right;
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-// Stack order, bottom to top. Only keys with non-zero values in the
-// series will produce visible bands; the rest collapse to zero-height.
+// Bottom-to-top stack order. Missing sources collapse to zero-height bands.
 const STACK_KEYS = ["solar", "wind", "hydro", "nuclear", "gas"];
 
 const SOURCE_LABELS = {
@@ -48,8 +37,7 @@ export function createGenerationStack(selector, config) {
         return { el: empty, reveal: () => {}, destroy: () => empty.remove() };
     }
 
-    // Prepare the data for d3.stack — each record needs all keys,
-    // defaulting to 0 for missing fields.
+    // d3.stack requires every record to carry every key, so fill missing with 0.
     const data = series.map((d) => {
         const row = { hour: d.hour, price: d.price };
         for (const k of STACK_KEYS) row[k] = d[k] || 0;
@@ -59,11 +47,9 @@ export function createGenerationStack(selector, config) {
 
     const stacked = d3.stack().keys(STACK_KEYS)(data);
 
-    // Wrapper
     const wrapper = document.createElement("div");
     wrapper.className = "gen-stack";
 
-    // Title
     const titleEl = document.createElement("p");
     titleEl.className = "gen-stack__title mono";
     titleEl.textContent = label || "Generation mix";
@@ -77,7 +63,6 @@ export function createGenerationStack(selector, config) {
     const g = svg.append("g")
         .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
 
-    // Scales
     const x = d3.scaleLinear()
         .domain([0, 23])
         .range([0, INNER_W]);
@@ -93,7 +78,6 @@ export function createGenerationStack(selector, config) {
         .domain([priceExtent[0] - pricePad, priceExtent[1] + pricePad])
         .range([INNER_H, 0]);
 
-    // Zero-price reference line
     if (yPrice.domain()[0] < 0 && yPrice.domain()[1] > 0) {
         g.append("line")
             .attr("class", "gen-stack__zero")
@@ -101,7 +85,6 @@ export function createGenerationStack(selector, config) {
             .attr("y1", yPrice(0)).attr("y2", yPrice(0));
     }
 
-    // Stacked areas
     const area = d3.area()
         .x((d) => x(d.data.hour))
         .y0((d) => y(d[0]))
@@ -116,7 +99,7 @@ export function createGenerationStack(selector, config) {
         .attr("fill", (d) => GENERATION_COLORS[d.key] || "#64748b")
         .attr("fill-opacity", 0.82);
 
-    // Total load dashed line (sum of generation as demand proxy)
+    // Sum of generation as a demand proxy — the true load curve isn't in the dataset.
     const loadLine = d3.line()
         .x((d) => x(d.hour))
         .y((d) => y(d._total))
@@ -127,7 +110,6 @@ export function createGenerationStack(selector, config) {
         .attr("class", "gen-stack__load")
         .attr("d", loadLine);
 
-    // Price line (secondary y-axis)
     const priceLine = d3.line()
         .x((d) => x(d.hour))
         .y((d) => yPrice(d.price))
@@ -138,7 +120,6 @@ export function createGenerationStack(selector, config) {
         .attr("class", "gen-stack__price")
         .attr("d", priceLine);
 
-    // Axes
     const xAxis = g.append("g")
         .attr("class", "gen-stack__axis gen-stack__axis--x")
         .attr("transform", `translate(0,${INNER_H})`)
@@ -151,7 +132,7 @@ export function createGenerationStack(selector, config) {
         );
     xAxis.select(".domain").remove();
 
-    // Left axis — generation MW
+    // Left axis: generation in GW (divide by 1000).
     const yAxisLeft = g.append("g")
         .attr("class", "gen-stack__axis gen-stack__axis--y")
         .call(
@@ -165,14 +146,12 @@ export function createGenerationStack(selector, config) {
     yAxisLeft.selectAll(".tick line")
         .attr("stroke", "rgba(255,255,255,0.06)");
 
-    // Left axis label
     g.append("text")
         .attr("class", "gen-stack__axis-label")
         .attr("x", -MARGIN.left + 4)
         .attr("y", -10)
         .text("GW");
 
-    // Right axis — price EUR/MWh
     const yAxisRight = g.append("g")
         .attr("class", "gen-stack__axis gen-stack__axis--y-price")
         .attr("transform", `translate(${INNER_W},0)`)
@@ -185,7 +164,6 @@ export function createGenerationStack(selector, config) {
         );
     yAxisRight.select(".domain").remove();
 
-    // Right axis label
     g.append("text")
         .attr("class", "gen-stack__axis-label gen-stack__axis-label--right")
         .attr("x", INNER_W + MARGIN.right - 4)
@@ -193,7 +171,6 @@ export function createGenerationStack(selector, config) {
         .attr("text-anchor", "end")
         .text("€/MWh");
 
-    // Legend — small colour dots + labels under the chart
     const legendG = svg.append("g")
         .attr("class", "gen-stack__legend")
         .attr("transform", `translate(${MARGIN.left}, ${HEIGHT - 6})`);
@@ -215,7 +192,6 @@ export function createGenerationStack(selector, config) {
             .text(SOURCE_LABELS[k] || k);
         lx += (SOURCE_LABELS[k] || k).length * 6 + 22;
     }
-    // Price legend dot
     const priceItem = legendG.append("g")
         .attr("transform", `translate(${lx}, 0)`);
     priceItem.append("line")
@@ -228,7 +204,6 @@ export function createGenerationStack(selector, config) {
         .attr("class", "gen-stack__legend-text")
         .text("Price");
 
-    // Hover crosshair + tooltip
     wrapper.style.position = "relative";
 
     const hoverG = g.append("g").attr("class", "gen-stack__hover").style("display", "none");
@@ -244,7 +219,6 @@ export function createGenerationStack(selector, config) {
     tipEl.style.display = "none";
     wrapper.appendChild(tipEl);
 
-    // Invisible overlay to capture mouse events across the full chart area
     svg.append("rect")
         .attr("class", "gen-stack__overlay")
         .attr("x", MARGIN.left).attr("y", MARGIN.top)
@@ -272,7 +246,6 @@ export function createGenerationStack(selector, config) {
             tipEl.innerHTML = lines.join("<br>");
             tipEl.style.display = "";
 
-            // Position tooltip near the crosshair, clamped to wrapper bounds
             const svgRect = svg.node().getBoundingClientRect();
             const wrapRect = wrapper.getBoundingClientRect();
             const tipX = (cx + MARGIN.left) * (svgRect.width / WIDTH);
@@ -286,8 +259,7 @@ export function createGenerationStack(selector, config) {
             tipEl.style.display = "none";
         });
 
-    // Clip path for animated reveal — starts fully clipped and
-    // reveal() transitions to full width over 1.2s.
+    // reveal() animates this clip rect from width 0 to full.
     const clipId = `gen-clip-${Math.random().toString(36).slice(2, 8)}`;
     svg.append("defs").append("clipPath")
         .attr("id", clipId)
