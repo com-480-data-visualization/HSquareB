@@ -1,48 +1,4 @@
-"""
-Preprocessing pipeline: ENTSO-E raw CSV → focused JSON files.
-
-The raw CSV is 301,391 rows across 23 bidding zones and is too large to
-ship to the browser. This script produces six small, purpose-built JSON
-artefacts under `docs/data/processed/`, one per scroll step or explorer view.
-
-Usage
------
-Regenerate every artefact:
-
-    .venv/bin/python scripts/preprocess.py
-
-Regenerate a single artefact:
-
-    .venv/bin/python scripts/preprocess.py showcase_day
-
-List targets:
-
-    .venv/bin/python scripts/preprocess.py --list
-
-Preprocessing rules
--------------------
-These rules are shared across every target and are the result of the
-dataset exploration pass (see project data exploration notes):
-
-1. **Focus countries only.** Drop every row where `country` is not in
-   `{CH, DE_LU, FR, IT_NORD, AT}`.
-2. **Friendly country codes.** Rename `DE_LU → DE` and `IT_NORD → IT` so
-   the frontend can treat codes as two-letter identifiers.
-3. **Timestamps** are parsed as UTC (the raw column mixes CET/CEST
-   offsets) then converted to `Europe/Berlin` for display and to UTC ISO
-   8601 strings for JSON output.
-4. **Hydro** uses the fully-populated `hydro_total` column; the
-   sub-component columns are ignored.
-5. **Sparse generation columns** are treated as zero. CH has no fossil
-   fuels. DE has no nuclear. AT has no nuclear / coal / oil / biomass /
-   offshore wind. IT / CH / AT have no offshore wind.
-6. **Renewable share** = `(solar + wind_onshore + wind_offshore +
-   hydro_total) / total_known_generation`, with missing columns treated
-   as zero in both numerator and denominator.
-7. **Price nulls** are forward-filled within each country — the raw CSV
-   has exactly one null price per focus country, a single shared missing
-   hour.
-"""
+"""ENTSO-E raw CSV to focused JSON files for the frontend."""
 
 from __future__ import annotations
 
@@ -55,10 +11,6 @@ from typing import Callable
 
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# Paths and constants
-# ---------------------------------------------------------------------------
-
 ROOT = Path(__file__).resolve().parent.parent
 RAW_CSV = ROOT / "data" / "entsoe_data_2024_2025.csv"
 OUTPUT_DIR = ROOT / "docs" / "data" / "processed"
@@ -67,7 +19,7 @@ DISPLAY_TZ = "Europe/Berlin"
 
 RAW_FOCUS_COUNTRIES = ["CH", "DE_LU", "FR", "IT_NORD", "AT"]
 
-# Raw-CSV name → friendly code used in JSON outputs and the frontend.
+# Raw CSV code to frontend code.
 COUNTRY_RENAME = {
     "CH": "CH",
     "DE_LU": "DE",
@@ -76,13 +28,10 @@ COUNTRY_RENAME = {
     "AT": "AT",
 }
 
-# Canonical order for the frontend — CH first because it is the
-# protagonist of the story.
+# CH first — it's the story's protagonist.
 FOCUS_ORDER = ["CH", "DE", "FR", "IT", "AT"]
 
-# Generation columns we actually use. Everything else in the CSV (the
-# `_*_actual_aggregated_` alternates, sub-components of hydro, fossil oil
-# shale, fossil peat, etc.) is intentionally ignored — see rule 4.
+# Hydro sub-components and `_*_actual_aggregated_` alternates are ignored; hydro_total is the one populated column.
 GENERATION_COLUMNS = [
     "solar",
     "wind_onshore",
@@ -101,33 +50,20 @@ GENERATION_COLUMNS = [
 
 RENEWABLE_COLUMNS = ["solar", "wind_onshore", "wind_offshore", "hydro_total"]
 
-# Per-country sparse-column documentation (rule 5).
-# Columns that are always zero or absent for a given country:
-#   CH: fossil_gas=0, fossil_hard_coal=0, fossil_brown_coal_lignite=0,
-#       fossil_oil=0, biomass=0, wind_offshore=0
-#   DE: nuclear=0
-#   AT: nuclear=0, fossil_hard_coal=0, fossil_oil=0, biomass=0, wind_offshore=0
-#   IT: wind_offshore=0
-#   FR: (all columns populated)
+# Country sparsity reference (missing = always 0 for that country):
+#   CH: fossil_*, biomass, wind_offshore
+#   DE: nuclear
+#   AT: nuclear, fossil_hard_coal, fossil_oil, biomass, wind_offshore
+#   IT: wind_offshore
+#   FR: all populated
 
-# The showcase day the opening scroll animation plays on: a sunny Sunday
-# when Switzerland hit -€145.12 per MWh at 13:00 CET, deeper in the red
-# than Germany at the same hour.
+# Sunny Sunday where CH hit -€145.12/MWh at 13:00 CET, deeper than DE.
 SHOWCASE_DATE = "2024-05-12"
-SHOWCASE_PEAK_HOUR = 13  # CET, when CH reaches its -145.12 trough.
+SHOWCASE_PEAK_HOUR = 13  # CET, CH's -145.12 trough.
 
-
-# ---------------------------------------------------------------------------
-# Shared loading + transforms
-# ---------------------------------------------------------------------------
 
 def load_raw() -> pd.DataFrame:
-    """Load the raw CSV with proper timezone handling.
-
-    The raw `datetime` column stores strings with a mix of CET and CEST
-    offsets, which pandas cannot infer as a single tz-aware dtype. Parse
-    as UTC, convert to `Europe/Berlin`.
-    """
+    """Load raw CSV. The datetime column mixes CET/CEST offsets, so parse as UTC and convert."""
     if not RAW_CSV.exists():
         raise FileNotFoundError(f"raw dataset not found at {RAW_CSV}")
     df = pd.read_csv(RAW_CSV)
@@ -136,24 +72,17 @@ def load_raw() -> pd.DataFrame:
 
 
 def filter_focus(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep only rows for the five focus bidding zones."""
     return df[df["country"].isin(RAW_FOCUS_COUNTRIES)].copy()
 
 
 def rename_countries(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply the friendly two-letter country codes in-place."""
     df = df.copy()
     df["country"] = df["country"].map(COUNTRY_RENAME)
     return df
 
 
 def fill_missing_generation(df: pd.DataFrame) -> pd.DataFrame:
-    """Replace missing values in generation columns with zero.
-
-    See rule 5 — this is the correct behaviour because a missing column
-    for a given country means that source genuinely does not contribute
-    there (e.g. CH has no gas plants), not that data is unknown.
-    """
+    """Fill missing generation with 0 — a missing column means the source genuinely doesn't exist there (e.g. no gas in CH), not unknown data."""
     df = df.copy()
     for col in GENERATION_COLUMNS:
         if col in df.columns:
@@ -162,19 +91,14 @@ def fill_missing_generation(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def forward_fill_prices(df: pd.DataFrame) -> pd.DataFrame:
-    """Forward-fill the single missing price hour within each country."""
+    """Forward-fill the single missing price hour per country."""
     df = df.copy().sort_values(["country", "datetime"])
     df["price"] = df.groupby("country", sort=False)["price"].ffill()
     return df
 
 
 def add_renewable_share(df: pd.DataFrame) -> pd.DataFrame:
-    """Add a `renewable_share` column in [0, 1].
-
-    The denominator is the sum of all tracked generation columns that
-    exist for the row's country, with missing values treated as zero.
-    Rows with zero total generation get NaN (there is nothing to share).
-    """
+    """renewable_share in [0, 1]; NaN when total generation is 0."""
     import numpy as np
 
     df = df.copy()
@@ -186,7 +110,6 @@ def add_renewable_share(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def standard_prep() -> pd.DataFrame:
-    """Return a DataFrame with every shared transform applied once."""
     df = load_raw()
     df = filter_focus(df)
     df = rename_countries(df)
@@ -196,12 +119,7 @@ def standard_prep() -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------------------
-# JSON output helpers
-# ---------------------------------------------------------------------------
-
 def save_json(obj: object, filename: str, *, minified: bool = True) -> Path:
-    """Write an object to `docs/data/processed/<filename>` and report size."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUTPUT_DIR / filename
     with path.open("w") as f:
@@ -215,17 +133,13 @@ def save_json(obj: object, filename: str, *, minified: bool = True) -> Path:
 
 
 def _json_default(value: object) -> object:
-    """Fallback for pandas / numpy types that `json` cannot serialise."""
+    """Fallback for pandas/numpy types json can't serialise."""
     if isinstance(value, pd.Timestamp):
         return value.isoformat()
     if hasattr(value, "item"):
         return value.item()
     raise TypeError(f"unserializable type: {type(value).__name__}")
 
-
-# ---------------------------------------------------------------------------
-# Target registry
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Target:
@@ -243,13 +157,7 @@ def _not_implemented(name: str) -> Callable[[pd.DataFrame], None]:
 
 
 def build_showcase_day(df: pd.DataFrame) -> None:
-    """Emit `showcase_day.json` — hourly data for every focus country
-    across the full 24 hours of the showcase date.
-
-    The frontend reads this once at page load and uses it to drive the
-    Step 1-3 clock animation. Shape is country-major so each country's
-    array can be joined directly to its SVG path.
-    """
+    """24 hourly rows per country for the showcase date. Country-major so each array joins directly to an SVG path."""
     target_date = pd.Timestamp(SHOWCASE_DATE).date()
     day = df[df["datetime"].dt.date == target_date].copy()
     if day.empty:
@@ -289,9 +197,7 @@ def build_showcase_day(df: pd.DataFrame) -> None:
     }
     save_json(payload, "showcase_day.json")
 
-    # Sanity check — CH's -145.12 peak at hour 13 is the headline fact
-    # the whole opening scroll animation is built around, so fail loudly
-    # if a reprocessing run ever drifts off it.
+    # CH's -145.12 at hour 13 is the headline fact the opening animation is built on — fail loudly if it drifts.
     ch_peak = countries["CH"][SHOWCASE_PEAK_HOUR]["price"]
     if abs(ch_peak - (-145.12)) > 0.5:
         raise RuntimeError(
@@ -302,28 +208,14 @@ def build_showcase_day(df: pd.DataFrame) -> None:
 
 
 def build_calendar_heatmap(df: pd.DataFrame) -> None:
-    """Emit `calendar_heatmap.json` — every hour of CH and DE, nested by day.
-
-    The frontend renders a `(day × hour)` grid for each country. Shaping
-    the file as a list of day records mirrors that structure directly:
-
-        selectAll('.day').data(days).selectAll('.cell').data(d => d.CH)
-
-    Each day's price array is flat — one entry per hour — so DST days
-    (spring forward = 23 entries, fall back = 25 entries) naturally vary
-    in length. There are only three DST transitions in the dataset range
-    (2024-03-31, 2024-10-27, 2025-03-30), but the format handles them
-    without special-casing.
-    """
+    """CH and DE hourly prices nested by day. Day arrays vary in length on DST days (23 or 25 hours); format handles it without special casing."""
     countries = ["CH", "DE"]
     sub = df[df["country"].isin(countries)].copy()
     sub = sub.sort_values(["country", "datetime"])
     sub["date"] = sub["datetime"].dt.date
     sub["hour"] = sub["datetime"].dt.hour
 
-    # Pre-bin prices into {(country, date): [price_in_hour_order]}. Hours
-    # are not assumed to be contiguous — on a DST spring-forward day the
-    # 02:00 slot is simply absent, which is correct.
+    # Hours aren't assumed contiguous — on spring-forward the 02:00 slot is legitimately absent.
     binned: dict[tuple[str, object], list[float]] = {}
     for (country, date), group in sub.groupby(["country", "date"], sort=False):
         prices = [
@@ -355,7 +247,7 @@ def build_calendar_heatmap(df: pd.DataFrame) -> None:
     }
     save_json(payload, "calendar_heatmap.json")
 
-    # Sanity checks tied to the initial dataset exploration pass.
+    # Targets come from the exploration pass.
     total_hours = {c: sum(len(d[c]) for d in days) for c in countries}
     neg_hours = {
         c: sum(1 for d in days for price in d[c] if price < 0)
@@ -381,29 +273,20 @@ def build_calendar_heatmap(df: pd.DataFrame) -> None:
 
 
 def build_daily_profiles(df: pd.DataFrame) -> None:
-    """Emit `daily_profiles.json` — average hourly price profile per
-    country per month, plus an annual average per country.
-
-    Step 6 animates each country's monthly profile through chronological
-    time, revealing the midday dip deepening into the classic duck curve.
-    Step 7's small multiples use the annual averages for a geographic
-    side-by-side comparison.
-    """
+    """Mean hourly price per (country, month) plus per-country annual average. Drives the duck-curve animation and small multiples."""
     work = df.copy()
     work["year"] = work["datetime"].dt.year
     work["month"] = work["datetime"].dt.month
     work["hour"] = work["datetime"].dt.hour
     work["month_key"] = work["datetime"].dt.strftime("%Y-%m")
 
-    # Canonical month ordering so the frontend iterates chronologically
-    # rather than relying on JS object-key insertion order.
+    # Sorted so the frontend iterates chronologically, not via JS key insertion order.
     months = sorted(work["month_key"].unique())
 
     countries: dict[str, dict[str, object]] = {}
     for code in FOCUS_ORDER:
         country_df = work[work["country"] == code]
 
-        # Monthly profile: mean price for each (month, hour) pair.
         monthly_means = (
             country_df.groupby(["month_key", "hour"], sort=False)["price"]
             .mean()
@@ -413,8 +296,7 @@ def build_daily_profiles(df: pd.DataFrame) -> None:
         for month_key in months:
             month_rows = monthly_means[monthly_means["month_key"] == month_key]
             by_hour = {int(r["hour"]): round(float(r["price"]), 2) for _, r in month_rows.iterrows()}
-            # Emit a fixed-length 24-vector; missing hours (extremely rare)
-            # fall back to None so the chart can interpolate.
+            # Fixed-length 24 vector; missing hours (rare) are None so charts can interpolate.
             profile = [by_hour.get(h) for h in range(24)]
             if any(p is None for p in profile):
                 raise RuntimeError(
@@ -422,8 +304,7 @@ def build_daily_profiles(df: pd.DataFrame) -> None:
                 )
             monthly[month_key] = profile  # type: ignore[assignment]
 
-        # Annual (whole-dataset) average — used as the ghost overlay in
-        # Step 7 and the explorer sidebar.
+        # Ghost overlay for Step 7 and the explorer sidebar.
         annual_series = country_df.groupby("hour")["price"].mean()
         annual = [round(float(annual_series[h]), 2) for h in range(24)]
 
@@ -439,7 +320,6 @@ def build_daily_profiles(df: pd.DataFrame) -> None:
     }
     save_json(payload, "daily_profiles.json")
 
-    # Sanity checks.
     if len(months) != 18:
         raise RuntimeError(f"expected 18 months (Jan 2024 – Jun 2025), got {len(months)}")
     for code in FOCUS_ORDER:
@@ -449,8 +329,7 @@ def build_daily_profiles(df: pd.DataFrame) -> None:
         if len(entry["annual_average"]) != 24:  # type: ignore[arg-type]
             raise RuntimeError(f"{code}: expected 24 annual-average points")
 
-    # Germany's annual profile should show a clear midday dip — if it
-    # doesn't, the aggregation is broken.
+    # DE should show a midday dip; if not, the groupby is broken.
     de_annual = countries["DE"]["annual_average"]
     midday_min = min(de_annual[9:16])  # type: ignore[index]
     evening_max = max(de_annual[17:22])  # type: ignore[index]
@@ -460,7 +339,7 @@ def build_daily_profiles(df: pd.DataFrame) -> None:
             f"(midday min={midday_min}, evening max={evening_max})"
         )
 
-    # France should be noticeably flatter than Germany (nuclear baseload).
+    # FR (nuclear baseload) should be flatter than DE.
     de_spread = max(de_annual) - min(de_annual)  # type: ignore[arg-type]
     fr_spread = max(countries["FR"]["annual_average"]) - min(countries["FR"]["annual_average"])  # type: ignore[arg-type]
     print(
@@ -475,18 +354,7 @@ def build_daily_profiles(df: pd.DataFrame) -> None:
 
 
 def build_explorer_hourly(df: pd.DataFrame) -> None:
-    """Emit `explorer_hourly.json` — hourly prices and renewable share for
-    all five focus countries across the full date range.
-
-    This is the dataset the explorer timeline would use if it scraped
-    across the full 18 months instead of just the showcase day. Structure
-    is date-major: each date key maps to a dict of country arrays so the
-    frontend can load one day at a time if needed.
-
-    For the Milestone 2 prototype the explorer uses showcase_day.json
-    (single day). This full-range file is built for completeness and
-    future explorer expansion.
-    """
+    """Full-range hourly prices + renewable share, date-major. M2 prototype still uses showcase_day.json; this is for future expansion."""
     work = df.copy()
     work["date"] = work["datetime"].dt.strftime("%Y-%m-%d")
     work["hour"] = work["datetime"].dt.hour
@@ -515,7 +383,6 @@ def build_explorer_hourly(df: pd.DataFrame) -> None:
     }
     save_json(payload, "explorer_hourly.json")
 
-    # Sanity checks.
     assert len(days) > 500, f"expected 500+ days, got {len(days)}"
     sample = days[0]
     for code in FOCUS_ORDER:
@@ -524,18 +391,8 @@ def build_explorer_hourly(df: pd.DataFrame) -> None:
 
 
 def build_generation_stacks(df: pd.DataFrame) -> None:
-    """Emit `generation_stacks.json` — hourly generation mix per country
-    across the full date range.
-
-    Each day is a record with per-country arrays of {solar, wind, hydro,
-    nuclear, gas} values. The frontend can use this to show the generation
-    stack for any day the explorer timeline lands on.
-
-    For the Milestone 2 prototype the sidebar generation stack uses
-    showcase_day.json (single day). This full-range file is built for
-    completeness and future expansion.
-    """
-    # Simplified generation columns for the frontend.
+    """Full-range hourly {solar, wind, hydro, nuclear, gas} per country. M2 still uses showcase_day.json; this is for future expansion."""
+    # Raw columns collapsed into the 5 frontend buckets. Coal lumps into gas.
     GEN_MAP = {
         "solar": "solar",
         "wind_onshore": "wind",
@@ -551,7 +408,6 @@ def build_generation_stacks(df: pd.DataFrame) -> None:
     work["date"] = work["datetime"].dt.strftime("%Y-%m-%d")
     work["hour"] = work["datetime"].dt.hour
 
-    # Aggregate the raw generation columns into the simplified set.
     for target_col in ["solar", "wind", "hydro", "nuclear", "gas"]:
         source_cols = [k for k, v in GEN_MAP.items() if v == target_col and k in work.columns]
         if source_cols:
@@ -584,9 +440,8 @@ def build_generation_stacks(df: pd.DataFrame) -> None:
     }
     save_json(payload, "generation_stacks.json")
 
-    # Sanity checks.
     assert len(days) > 500, f"expected 500+ days, got {len(days)}"
-    # Check showcase day (2024-05-12) DE solar at hour 13 is >40000.
+    # DE solar at showcase peak should be >40 GW.
     showcase = next(d for d in days if d["date"] == SHOWCASE_DATE)
     de_solar_13 = showcase["DE"]["solar"][13]
     assert de_solar_13 > 40000, f"DE solar at showcase peak should be >40k, got {de_solar_13}"
@@ -628,7 +483,6 @@ TARGETS: dict[str, Target] = {
 
 
 def build(names: list[str]) -> None:
-    """Run the shared prep once, then invoke each named target's builder."""
     print(f"Loading and preparing raw data from {RAW_CSV.relative_to(ROOT)}")
     df = standard_prep()
     print(f"  rows after focus filter: {len(df):,}")
@@ -654,10 +508,6 @@ def build(names: list[str]) -> None:
             print(f"  - {name}: {exc}")
         sys.exit(1)
 
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(

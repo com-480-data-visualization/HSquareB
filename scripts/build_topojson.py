@@ -1,18 +1,4 @@
-"""
-Build the 5-country map geometry used by the scrollytelling visualisation.
-
-Source:   Mike Bostock's `world-atlas` package (Natural Earth 1:50m,
-          already simplified and quantised). Pulled once from jsdelivr.
-Output:   docs/data/processed/map.topojson — only CH, DE, FR, IT, AT, with
-          only the arcs those five countries reference.
-
-The script is pure stdlib so it does not depend on geopandas, shapely, or
-the third-party `topojson` library.
-
-Run from the repo root:
-
-    .venv/bin/python scripts/build_topojson.py
-"""
+"""Build the 5-country TopoJSON map from Bostock's world-atlas (Natural Earth 1:50m). Pure stdlib — no geopandas/shapely."""
 
 from __future__ import annotations
 
@@ -25,17 +11,10 @@ from typing import Any
 SOURCE_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
 OUTPUT_PATH = Path("docs/data/processed/map.topojson")
 
-# Bounding box used to strip overseas territories out of MultiPolygon
-# geometries (notably France's DOM-TOMs). A polygon is kept if its centroid
-# falls inside this box. Covers continental Europe with enough margin for
-# Portuguese islands, UK / Ireland, and the Mediterranean coastline — but
-# drops Guiana, Reunion, Mayotte, Martinique, etc.
+# Drops France's DOM-TOMs (Guiana, Reunion, etc) while keeping Portuguese islands and the Med.
 EUROPE_BBOX = (-12.0, 33.0, 35.0, 72.0)  # (minLon, minLat, maxLon, maxLat)
 
-# Numeric ISO 3166-1 codes → friendly two-letter codes used everywhere in the
-# frontend. world-atlas stores ids as strings with a leading zero where the
-# numeric code has fewer than three digits (e.g. Austria is "040"), so we
-# match as strings and accept either form to be safe.
+# world-atlas pads ISO numeric ids with a leading zero (AT = "040"), so match as strings.
 FOCUS_BY_ISO_NUMERIC = {
     "040": "AT",
     "250": "FR",
@@ -44,7 +23,6 @@ FOCUS_BY_ISO_NUMERIC = {
     "756": "CH",
 }
 
-# Display names — kept short for map labels.
 DISPLAY_NAME = {
     "AT": "Austria",
     "CH": "Switzerland",
@@ -61,7 +39,7 @@ def fetch_source() -> dict[str, Any]:
 
 
 def _normalise_id(value: Any) -> str:
-    """world-atlas ids are strings, but be defensive against ints."""
+    """world-atlas ids are strings, but guard against ints too."""
     if isinstance(value, int):
         return f"{value:03d}"
     if isinstance(value, str):
@@ -82,7 +60,7 @@ def filter_focus_geometries(world: dict[str, Any]) -> list[dict[str, Any]]:
             props["iso_code"] = code
             props["name"] = DISPLAY_NAME[code]
             new = dict(g)
-            new["id"] = code  # friendly code replaces numeric id
+            new["id"] = code
             new["properties"] = props
             focus.append(new)
             seen.add(code)
@@ -94,12 +72,7 @@ def filter_focus_geometries(world: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def collect_used_arcs(geometry: Any, used: set[int]) -> None:
-    """Walk a TopoJSON geometry tree and record every arc index it touches.
-
-    Arc indices are stored as non-negative ints (forward traversal) or as
-    `~n` (bitwise NOT) to mean "arc n, reversed". `~n == -n - 1` in Python.
-    We normalise everything to the forward index for the "used" set.
-    """
+    """Record every arc index a geometry touches. TopoJSON encodes reversed arcs as `~n`; we normalise to the forward index."""
     if isinstance(geometry, dict):
         if "arcs" in geometry:
             collect_used_arcs(geometry["arcs"], used)
@@ -117,7 +90,7 @@ def collect_used_arcs(geometry: Any, used: set[int]) -> None:
 
 
 def remap_arcs(tree: Any, index_map: dict[int, int]) -> Any:
-    """Return a copy of a TopoJSON arc-tree with every arc index remapped."""
+    """Copy an arc tree with every index remapped through `index_map`."""
     if isinstance(tree, int):
         if tree >= 0:
             return index_map[tree]
@@ -138,7 +111,7 @@ def decode_arc(
     arc: list[list[int]],
     transform: dict[str, list[float]],
 ) -> list[tuple[float, float]]:
-    """Apply delta-decode + transform to a single arc, returning lon/lat points."""
+    """Delta-decode a quantised arc into lon/lat points."""
     scale = transform["scale"]
     translate = transform["translate"]
     points: list[tuple[float, float]] = []
@@ -158,7 +131,7 @@ def polygon_centroid(
     arcs: list[list[list[int]]],
     transform: dict[str, list[float]],
 ) -> tuple[float, float]:
-    """Rough centroid of a polygon's outer ring (first ring in the list)."""
+    """Rough centroid of the outer ring — good enough for a bbox test."""
     if not polygon:
         return (0.0, 0.0)
     outer_ring = polygon[0]
@@ -182,12 +155,7 @@ def prune_overseas_polygons(
     arcs: list[list[list[int]]],
     transform: dict[str, list[float]],
 ) -> dict[str, Any]:
-    """Drop MultiPolygon members whose centroid falls outside Europe.
-
-    Polygons are returned unchanged. Polygon-type geometries are returned
-    unchanged. MultiPolygons are filtered; if only one polygon survives,
-    the geometry type is downgraded to Polygon for compactness.
-    """
+    """Drop MultiPolygon members outside Europe. Downgrade to Polygon if only one survives."""
     if geom.get("type") != "MultiPolygon":
         return geom
 
@@ -218,13 +186,7 @@ def compute_bbox_from_arcs(
     arcs: list[list[list[int]]],
     transform: dict[str, list[float]],
 ) -> list[float]:
-    """Compute a geographic bbox [minX, minY, maxX, maxY] from quantised arcs.
-
-    Quantised arc positions are stored as delta-encoded integers. Each arc
-    starts at its first absolute point and subsequent points are relative.
-    Applying the transform `position = point * scale + translate` returns
-    longitude/latitude in degrees.
-    """
+    """bbox [minX, minY, maxX, maxY] in degrees from delta-encoded arcs."""
     scale = transform["scale"]
     translate = transform["translate"]
 
@@ -252,8 +214,7 @@ def compute_bbox_from_arcs(
 def build(world: dict[str, Any]) -> dict[str, Any]:
     focus_geoms = filter_focus_geometries(world)
 
-    # Strip overseas territories from MultiPolygons BEFORE counting used arcs
-    # so the output doesn't drag Guiana / Reunion arcs along for the ride.
+    # Prune before collecting arcs, otherwise overseas arcs get dragged in.
     transform = world.get("transform")
     if transform is None:
         raise RuntimeError("expected quantised source topology with a transform")
@@ -263,7 +224,7 @@ def build(world: dict[str, Any]) -> dict[str, Any]:
     for g in focus_geoms:
         collect_used_arcs(g, used)
 
-    # Build new arcs list with a dense 0..N-1 numbering that preserves order.
+    # Dense 0..N-1 renumbering that preserves original order.
     old_arcs = world["arcs"]
     old_to_new: dict[int, int] = {}
     new_arcs: list[Any] = []

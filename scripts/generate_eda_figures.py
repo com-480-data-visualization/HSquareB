@@ -1,15 +1,4 @@
-"""
-Generate EDA diagrams for the Milestone 2 report.
-
-Produces four publication-quality figures in the project's dark theme:
-  1. Negative-price hours bar chart (Section 2.1)
-  2. CH vs DE hourly price scatter (Section 2.2)
-  3. Duck curve — DE monthly profiles (Section 2.3)
-  4. Monthly renewable share by country (Section 2.4)
-
-Usage:
-    .venv/bin/python scripts/generate_eda_figures.py
-"""
+"""EDA figures for the Milestone 2 report — four PNGs in the site's dark theme."""
 
 from pathlib import Path
 
@@ -20,13 +9,12 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 
-# ---- Paths ----
 ROOT = Path(__file__).resolve().parent.parent
 RAW_CSV = ROOT / "data" / "entsoe_data_2024_2025.csv"
 OUT_DIR = ROOT / "milestone_2" / "figures"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ---- Theme (matches the website's dark palette) ----
+# Matches the site's dark palette.
 BG = "#0a0e1a"
 SURFACE = "#141827"
 TEXT = "#e8eaed"
@@ -75,7 +63,6 @@ def load():
     return df
 
 
-# ---- Figure 1: Negative-price hours bar chart ----
 def fig_neg_hours(df):
     counts = (
         df[df["price"] < 0]
@@ -117,7 +104,6 @@ def fig_neg_hours(df):
     print(f"  saved {out.name} ({out.stat().st_size // 1024} KB)")
 
 
-# ---- Figure 2: CH vs DE scatter ----
 def fig_scatter(df):
     ch = df[df["country"] == "CH"][["datetime", "price"]].set_index("datetime")
     de = df[df["country"] == "DE"][["datetime", "price"]].set_index("datetime")
@@ -135,7 +121,6 @@ def fig_scatter(df):
         edgecolors="none",
         rasterized=True,
     )
-    # Identity line
     lims = [-250, 350]
     ax.plot(lims, lims, color=MUTED, linewidth=0.8, linestyle="--", alpha=0.6)
     ax.set_xlim(lims)
@@ -153,7 +138,6 @@ def fig_scatter(df):
     cbar.ax.yaxis.set_tick_params(color=MUTED)
     plt.setp(cbar.ax.yaxis.get_ticklabels(), color=MUTED, fontsize=9)
 
-    # Annotate correlation
     corr = merged["price_ch"].corr(merged["price_de"])
     ax.text(
         0.04, 0.96,
@@ -171,7 +155,6 @@ def fig_scatter(df):
     print(f"  saved {out.name} ({out.stat().st_size // 1024} KB)")
 
 
-# ---- Figure 3: Duck curve (DE monthly profiles) ----
 def fig_duck(df):
     de = df[df["country"] == "DE"].copy()
     de["hour"] = de["datetime"].dt.hour
@@ -183,7 +166,7 @@ def fig_duck(df):
 
     fig, ax = plt.subplots(figsize=(7, 4))
 
-    # Annual average as reference
+    # Reference line.
     annual = de.groupby("hour")["price"].mean()
     ax.plot(
         annual.index, annual.values,
@@ -213,7 +196,6 @@ def fig_duck(df):
     ax.spines["right"].set_visible(False)
     ax.legend(loc="upper left", fontsize=9, framealpha=0.3, edgecolor="none")
 
-    # Annotate the belly
     ax.annotate(
         "Midday\ntrough",
         xy=(13, annual.iloc[13]),
@@ -230,7 +212,6 @@ def fig_duck(df):
     print(f"  saved {out.name} ({out.stat().st_size // 1024} KB)")
 
 
-# ---- Figure 4: Monthly renewable share ----
 def fig_renewable(df):
     ren_cols = ["solar", "wind_onshore", "wind_offshore", "hydro_total"]
     gen_cols = ren_cols + [

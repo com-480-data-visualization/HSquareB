@@ -1,17 +1,4 @@
-"""
-One-shot exploratory diagnostic for the ENTSO-E raw dataset.
-
-Answers three questions before the preprocessing pipeline is written:
-
-1. What does the dataset look like — shape, date range, timezone, countries?
-2. For each focus country (CH, DE_LU, FR, IT_NORD, AT), which generation
-   columns are usable (non-null, non-zero share)?
-3. Do the design-spec headline facts match the data we have?
-
-Run from the repo root:
-
-    .venv/bin/python scripts/explore.py
-"""
+"""One-shot EDA for the ENTSO-E raw dataset: shape, per-country fill rates, and spec fact checks."""
 
 from __future__ import annotations
 
@@ -21,16 +8,12 @@ import pandas as pd
 
 RAW_CSV = Path("data/entsoe_data_2024_2025.csv")
 
-# All analyses are anchored in Central European Time — the timezone the
-# German and Swiss markets actually trade in. The raw CSV mixes CET/CEST
-# offsets, so we parse as UTC and explicitly convert.
+# DE/CH markets trade in CET. Raw column mixes CET/CEST so we parse UTC then convert.
 DISPLAY_TZ = "Europe/Berlin"
 
 FOCUS_COUNTRIES = ["CH", "DE_LU", "FR", "IT_NORD", "AT"]
 
-# Columns the visualisation cares about — clean names first, then the
-# "_*_actual_aggregated_" alternates that appear to be country-specific
-# fallbacks.
+# Clean names first; `_*_actual_aggregated_` appear to be country-specific fallbacks.
 GENERATION_COLUMNS_PRIMARY = [
     "solar",
     "wind_onshore",
@@ -65,12 +48,8 @@ GENERATION_COLUMNS_FALLBACK = [
     "_other_renewable_actual_aggregated_",
 ]
 
-# Headline facts from the design spec (Section 2, "Showcase day" and
-# Section 10, "Key data insights"). These drive the narrative — if any
-# disagree with the raw data, the story needs to change before we build.
-#
-# The peak trough on 2024-05-12 is 13:00 CET, not 11:00. FR actually
-# troughs at 14:00 and is still falling at 13:00. Tolerances are tight.
+# Headline facts from the spec — if any disagree with raw data, the story needs to change.
+# Trough is 13:00 CET (not 11:00). FR troughs one hour later at 14:00.
 SPEC_FACTS = {
     "CH 2024-05-12 13:00 price ≈ -145 EUR/MWh": ("CH", "2024-05-12 13:00", "price", -145.12, 0.5),
     "DE_LU 2024-05-12 13:00 price ≈ -135 EUR/MWh": ("DE_LU", "2024-05-12 13:00", "price", -135.45, 0.5),
@@ -95,8 +74,7 @@ def section(title: str) -> None:
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(RAW_CSV)
-    # pandas cannot infer a single dtype for a column whose strings carry
-    # different UTC offsets (CET vs CEST), so parse via UTC and convert.
+    # CET/CEST mixed offsets — parse as UTC, convert.
     df["datetime"] = pd.to_datetime(df["datetime"], utc=True).dt.tz_convert(DISPLAY_TZ)
     return df
 
@@ -157,13 +135,13 @@ def generation_fill_rates(df: pd.DataFrame) -> None:
         rows.append(row)
 
     fill = pd.DataFrame(rows).set_index("country").T
-    # Only print rows where at least one focus country has a non-zero fill rate
+    # Drop rows where every focus country is 0/null.
     keep = fill[(fill.fillna(0) > 0).any(axis=1)]
     print(keep.to_string())
 
 
 def _num(row: pd.Series, col: str) -> float:
-    """Read a numeric cell, treating missing / NaN / absent column as 0."""
+    """Read a numeric cell; missing/NaN/absent = 0."""
     if col not in row.index:
         return 0.0
     val = row[col]
