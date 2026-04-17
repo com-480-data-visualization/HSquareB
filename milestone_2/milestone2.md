@@ -122,10 +122,11 @@ Two terms used in the table below. A *mix donut* is a small donut chart showing 
 
 ### 3.3 Interactive explorer
 
-After the guided story, the reader can drive the map themselves. A timeline scrubber covers one full showcase day in hourly steps. Playback runs at 1x, 2x or 4x speed, with Space and the arrow keys as keyboard shortcuts. Clicking any country opens a sidebar showing that country's generation stack, daily price profile with the annual average as a ghost line, and summary stats (current price, renewable share, spread to Italy). A colour-mode toggle recolours the map by renewable share instead of price.
+After the guided story, the reader can drive the map themselves. A timeline scrubber covers one full showcase day in hourly steps. Playback runs at 1x, 2x or 4x speed, with the Space bar and the arrow keys as keyboard shortcuts. Clicking any country opens a sidebar showing that country's generation stack, daily price profile with the annual average shown as a ghost line, and summary stats (current price, renewable share, spread to Italy). A colour-mode toggle recolours the map to show renewable energy production instead of price.
 
 ![Interactive explorer: the reader controls the same canvas directly. Timeline scrubber at hour 13, Switzerland sidebar open with generation stack and daily profile, play / pause and speed controls at the bottom.](figures/fig_06_explorer.png)
 
+![Interactive explorer: the reader can also toggle the colour mode to show renewable energy production](figures/fig_07_colour_toggle.png)
 ### 3.4 Visual language
 
 The site runs dark-only. The background is a three-level navy ramp. The price scale is a diverging sequential from ice-white for deep negatives (where the drama lives), through the navy baseline, to warm orange and red for positive peaks. Using ice-white for extreme negatives is a deliberate inversion of the usual "darker equals more extreme" convention: negative prices are the thing we want the reader to notice, so they get the brightest treatment. Typography pairs Fraunces (variable serif, used at display sizes for the hero numbers and editorial copy) with JetBrains Mono (for every data value, timestamp, country code, and legend). Numbers are never set in the serif. The palette choice draws on Lecture 6.1 (perception and colour) and the typographic hierarchy on Lecture 7.1 (designing visualisations).
