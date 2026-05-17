@@ -282,13 +282,35 @@ export function createMap(selector, config) {
 
     const legendEl = container.querySelector(".map-legend");
     const arrowLegendEl = container.querySelector(".arrow-legend");
-    if (legendEl) {
-        const canvas = legendEl.querySelector(".map-legend__bar");
-        const ticksEl = legendEl.querySelector(".map-legend__ticks");
-        if (canvas && ticksEl) {
-            const ctx = canvas.getContext("2d");
-            const w = canvas.width;
-            const grad = ctx.createLinearGradient(0, 0, w, 0);
+    const legendCanvas = legendEl?.querySelector(".map-legend__bar");
+    const legendTicksEl = legendEl?.querySelector(".map-legend__ticks");
+    const legendCaptionEl = legendEl?.querySelector(".map-legend__caption");
+
+    function drawLegend(mode) {
+        if (!legendCanvas || !legendTicksEl) return;
+        const ctx = legendCanvas.getContext("2d");
+        const w = legendCanvas.width;
+        ctx.clearRect(0, 0, w, legendCanvas.height);
+        const grad = ctx.createLinearGradient(0, 0, w, 0);
+
+        if (mode === "renewable") {
+            // renewableAmountColor domain [0, 5000, 15000, 30000, 50000] MW.
+            const domain = [0, 5000, 15000, 30000, 50000];
+            const colors = ["#1e293b", "#065f46", "#10b981", "#34d399", "#6ee7b7"];
+            const max = domain[domain.length - 1];
+            for (let i = 0; i < domain.length; i++) {
+                grad.addColorStop(domain[i] / max, colors[i]);
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, legendCanvas.height);
+            legendTicksEl.replaceChildren();
+            [0, 10, 25, 50].forEach((gw) => {
+                const span = document.createElement("span");
+                span.textContent = String(gw);
+                legendTicksEl.appendChild(span);
+            });
+            if (legendCaptionEl) legendCaptionEl.textContent = "GW renewable";
+        } else {
             // priceContinuous domain [-200..300] mapped onto [0..1].
             const domain = [-200, -100, -50, 0, 40, 75, 150, 300];
             const colors = [
@@ -300,14 +322,18 @@ export function createMap(selector, config) {
                 grad.addColorStop((domain[i] - domain[0]) / range, colors[i]);
             }
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, canvas.height);
+            ctx.fillRect(0, 0, w, legendCanvas.height);
+            legendTicksEl.replaceChildren();
             [-100, 0, 100, 200].forEach((p) => {
                 const span = document.createElement("span");
                 span.textContent = p < 0 ? `\u2212${Math.abs(p)}` : String(p);
-                ticksEl.appendChild(span);
+                legendTicksEl.appendChild(span);
             });
+            if (legendCaptionEl) legendCaptionEl.textContent = "EUR / MWh";
         }
     }
+
+    drawLegend("price");
 
     const labelGroups = gLabels
         .selectAll("g.label")
@@ -682,10 +708,16 @@ export function createMap(selector, config) {
      * Pass `{ hour: null }` to reset to the dark base state.
      */
     function update(next) {
+        const prevMode = state.colorMode;
         Object.assign(state, next);
 
-        if (legendEl) legendEl.classList.toggle("is-visible", state.hour != null && !!showcase);
-        if (arrowLegendEl) arrowLegendEl.classList.toggle("is-visible", state.hour != null && !!showcase);
+        const isVisible = state.hour != null && !!showcase;
+        if (legendEl) legendEl.classList.toggle("is-visible", isVisible);
+        if (arrowLegendEl) arrowLegendEl.classList.toggle("is-visible", isVisible);
+
+        if ("colorMode" in next && next.colorMode !== prevMode) {
+            drawLegend(state.colorMode);
+        }
 
         if (state.hour == null || !showcase) {
             countryPaths

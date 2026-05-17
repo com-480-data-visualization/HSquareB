@@ -1064,7 +1064,8 @@ body.is-iris-firing .scene__map::before {
     flex-direction: column;
     gap: 4px;
     opacity: 0;
-    transition: opacity var(--dur-default) var(--ease-default);
+    transition: opacity var(--dur-default) var(--ease-default),
+                bottom var(--dur-medium) var(--ease-default);
     pointer-events: none;
 }
 
@@ -1082,14 +1083,14 @@ body.is-iris-firing .scene__map::before {
 .map-legend__ticks {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.04em;
     color: var(--text-muted);
     padding: 0 1px;
 }
 
 .map-legend__caption {
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-ghost);
@@ -1106,11 +1107,12 @@ body.is-iris-firing .scene__map::before {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.04em;
     color: var(--text-muted);
     opacity: 0;
-    transition: opacity var(--dur-default) var(--ease-default);
+    transition: opacity var(--dur-default) var(--ease-default),
+                bottom var(--dur-medium) var(--ease-default);
     pointer-events: none;
 }
 
@@ -1120,6 +1122,19 @@ body.is-iris-firing .scene__map::before {
 
 .arrow-legend svg {
     flex-shrink: 0;
+}
+
+/* Lift both legends above the explorer timeline when it is docked.
+ * Timeline height ≈ 200px; its own bottom = clamp(24px,4vh,56px).
+ * The +210px / +258px offsets clear the full timeline box. */
+@supports selector(:has(.a)) {
+    body:has(.explorer__timeline-wrap.is-visible) .map-legend {
+        bottom: calc(clamp(24px, 4vh, 56px) + env(safe-area-inset-bottom, 0px) + 210px);
+    }
+
+    body:has(.explorer__timeline-wrap.is-visible) .arrow-legend {
+        bottom: calc(clamp(24px, 4vh, 56px) + env(safe-area-inset-bottom, 0px) + 258px);
+    }
 }
 
 /* --- Leader line (card → country) --- */
