@@ -110,6 +110,15 @@ export function createGenerationStack(selector, config) {
         .attr("class", "gen-stack__load")
         .attr("d", loadLine);
 
+    // "Total gen." label at the left end of the load line.
+    const firstTotal = data[0]?._total ?? 0;
+    g.append("text")
+        .attr("class", "gen-stack__load-label")
+        .attr("x", x(0) + 2)
+        .attr("y", y(firstTotal) - 5)
+        .attr("text-anchor", "start")
+        .text("Total gen.");
+
     const priceLine = d3.line()
         .x((d) => x(d.hour))
         .y((d) => yPrice(d.price))
@@ -119,6 +128,17 @@ export function createGenerationStack(selector, config) {
         .datum(data)
         .attr("class", "gen-stack__price")
         .attr("d", priceLine);
+
+    // Hour-13 annotation: vertical dashed line at the midday price trough.
+    g.append("line")
+        .attr("class", "gen-stack__annot-line")
+        .attr("x1", x(13)).attr("x2", x(13))
+        .attr("y1", 0).attr("y2", INNER_H);
+    g.append("text")
+        .attr("class", "gen-stack__annot-label")
+        .attr("x", x(13) + 3)
+        .attr("y", 10)
+        .text("13:00 — price trough");
 
     const xAxis = g.append("g")
         .attr("class", "gen-stack__axis gen-stack__axis--x")

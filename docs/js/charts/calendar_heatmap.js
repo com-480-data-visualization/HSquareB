@@ -231,6 +231,11 @@ function renderChart(holder, chartData, country) {
     legendEl.appendChild(labelsRow);
     holder.appendChild(legendEl);
 
+    const descEl = document.createElement("p");
+    descEl.className = "cal-heatmap__desc mono";
+    descEl.textContent = "Rows = days \u00b7 Columns = hours (00\u201323) \u00b7 Colour = price (\u20ac/MWh)";
+    holder.appendChild(descEl);
+
     function teardown() {
         canvas.removeEventListener("pointermove", onMove);
         while (holder.firstChild) holder.removeChild(holder.firstChild);

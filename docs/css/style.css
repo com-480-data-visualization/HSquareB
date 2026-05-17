@@ -1894,6 +1894,24 @@ body.is-iris-firing .scene__map::before {
     font-weight: 600;
 }
 
+.spark__country-tag {
+    font-size: 9px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--accent) 65%, var(--text-secondary));
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+}
+
+.spark__caption {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 3px 0 0;
+}
+
 .gen-donut__label {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -1901,6 +1919,24 @@ body.is-iris-firing .scene__map::before {
     fill: var(--text-primary);
     font-variant-numeric: tabular-nums;
     font-variation-settings: normal;
+}
+
+.gen-donut__dom {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    margin: 3px 0 0;
+}
+
+.gen-donut__time {
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    text-align: center;
+    margin: 1px 0 0;
 }
 
 /* --- Calendar heatmap --- */
@@ -2048,6 +2084,14 @@ body.is-iris-firing .scene__map::before {
     letter-spacing: 0.05em;
 }
 
+.cal-heatmap__desc {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 8px 0 0;
+}
+
 /* --- Generation stack --- */
 
 .gen-stack {
@@ -2129,6 +2173,25 @@ body.is-iris-firing .scene__map::before {
     font-variation-settings: normal;
 }
 
+.gen-stack__annot-line {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.gen-stack__annot-label,
+.gen-stack__load-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    fill: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-variation-settings: normal;
+    pointer-events: none;
+}
+
 .gen-stack__crosshair {
     stroke: var(--text-muted);
     stroke-width: 1;
@@ -2193,6 +2256,16 @@ body.is-iris-firing .scene__map::before {
     stroke: color-mix(in srgb, var(--text-muted) 40%, transparent);
     stroke-width: 1;
     stroke-dasharray: 3 3;
+}
+
+.daily-profile__ghost-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    fill: color-mix(in srgb, var(--text-muted) 60%, transparent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-variation-settings: normal;
+    pointer-events: none;
 }
 
 .daily-profile__area {
@@ -2268,6 +2341,16 @@ body.is-iris-firing .scene__map::before {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px 12px;
     max-width: 500px;
+}
+
+.small-multiples__caption {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 4px 0 0;
 }
 
 @media (max-width: 900px) {
