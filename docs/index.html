@@ -127,6 +127,11 @@
                 </svg>
                 <span>Electricity flows from cheap to expensive</span>
             </div>
+
+            <div class="bar-legend" aria-label="Renewable bar height scale">
+                <svg class="bar-legend__chart" width="90" height="74" aria-hidden="true"></svg>
+                <p class="bar-legend__caption mono">GW renewable</p>
+            </div>
         </aside>
 
         <!-- Sits above map, below cards. Populated by js/narrative.js. -->
@@ -302,6 +307,7 @@
                             <div class="timeline__mode mono" data-color-mode aria-label="Map color mode">
                                 <button type="button" class="timeline__mode-btn is-active" data-mode="price">Price</button>
                                 <button type="button" class="timeline__mode-btn" data-mode="renewable">Renewable</button>
+                                <button type="button" class="timeline__mode-btn" data-mode="both">Both</button>
                             </div>
                         </div>
 

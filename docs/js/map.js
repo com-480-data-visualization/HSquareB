@@ -61,6 +61,14 @@ const ARROW_WIDTH_PIVOT = 150;
 // Particles pooled per flow; t wraps 1→0 so DOM population stays flat.
 // Density scales with |spread|. Guide path stays at low opacity as a fallback
 // when no particle happens to be on the route.
+// 3D bars (in "both" mode): height uses sqrt scale so small countries
+// (CH, AT) remain visible alongside Germany's large peak output.
+const BAR_W = 26;
+const BAR_MAX_H = 100;
+const BAR_DX = 9;     // depth offset x (right)
+const BAR_DY = -5;    // depth offset y (upward — positive y is down in SVG)
+const BAR_MAX_MW = 50000;
+
 const PARTICLE_MIN_COUNT = 4;
 const PARTICLE_MAX_COUNT = 14;
 const PARTICLE_BASE_RADIUS = 1.6;
@@ -104,6 +112,7 @@ export function createMap(selector, config) {
         .attr("d", "M 0 1 L 8 5 L 0 9 z")
         .attr("fill", "context-stroke");
 
+
     const particleFilter = defs.append("filter")
         .attr("id", "particle-glow")
         .attr("x", "-50%").attr("y", "-50%")
@@ -131,7 +140,7 @@ export function createMap(selector, config) {
 
     const pathGen = d3.geoPath(projection);
 
-    // Order matters: cartouche last so compass + scale bar stay legible above fills.
+    // Order matters: bars above labels so GW text is readable; cartouche last.
     const gGraticule = svg.append("g").attr("class", "graticule");
     const gRings = svg.append("g").attr("class", "graticule__rings");
     const gCountries = svg.append("g").attr("class", "countries");
@@ -141,6 +150,7 @@ export function createMap(selector, config) {
         .attr("filter", "url(#particle-glow)");
     const gParticlesNode = gParticles.node();
     const gLabels = svg.append("g").attr("class", "labels");
+    const gBars = svg.append("g").attr("class", "bars3d");
     const gCartouche = svg.append("g").attr("class", "cartouche");
 
     // Internal geometry is static; outer transform and scale bar length
@@ -282,9 +292,64 @@ export function createMap(selector, config) {
 
     const legendEl = container.querySelector(".map-legend");
     const arrowLegendEl = container.querySelector(".arrow-legend");
+    const barLegendEl = container.querySelector(".bar-legend");
+    const barLegendChart = barLegendEl?.querySelector(".bar-legend__chart");
     const legendCanvas = legendEl?.querySelector(".map-legend__bar");
     const legendTicksEl = legendEl?.querySelector(".map-legend__ticks");
     const legendCaptionEl = legendEl?.querySelector(".map-legend__caption");
+
+    function drawBarLegend(show) {
+        if (!barLegendEl || !barLegendChart) return;
+        barLegendEl.classList.toggle("is-visible", show);
+        if (!show) return;
+
+        while (barLegendChart.firstChild) barLegendChart.firstChild.remove();
+
+        const refs = [10, 25, 50]; // GW reference values
+        const centers = [15, 45, 75];
+        const lBarW = 12;
+        const lDx = 5;
+        const lDy = -3;
+        const lMaxH = 56;
+        const baseline = 62;
+        const SVG_NS_L = "http://www.w3.org/2000/svg";
+
+        refs.forEach((gw, i) => {
+            const mw = gw * 1000;
+            const h = Math.sqrt(mw / BAR_MAX_MW) * lMaxH;
+            const cx = centers[i];
+            const x0 = cx - lBarW / 2;
+            const x1 = cx + lBarW / 2;
+            const yBot = baseline;
+            const yTop = yBot - h;
+
+            const baseColor = renewableAmountColor(mw);
+            const col = d3.color(baseColor) || d3.color("#10b981");
+
+            const pts = (poly) => poly.map((p) => p.join(",")).join(" ");
+
+            const side = [[x1, yTop], [x1 + lDx, yTop + lDy], [x1 + lDx, yBot + lDy], [x1, yBot]];
+            const front = [[x0, yBot], [x0, yTop], [x1, yTop], [x1, yBot]];
+            const top = [[x0, yTop], [x0 + lDx, yTop + lDy], [x1 + lDx, yTop + lDy], [x1, yTop]];
+
+            [[side, col.darker(0.9)], [front, col], [top, col.brighter(0.5)]].forEach(([poly, fill]) => {
+                const el = document.createElementNS(SVG_NS_L, "polygon");
+                el.setAttribute("points", pts(poly));
+                el.setAttribute("fill", fill.toString());
+                barLegendChart.appendChild(el);
+            });
+
+            const label = document.createElementNS(SVG_NS_L, "text");
+            label.setAttribute("x", cx + lDx / 2);
+            label.setAttribute("y", baseline + 11);
+            label.setAttribute("text-anchor", "middle");
+            label.setAttribute("fill", "#94a3b8");
+            label.setAttribute("font-size", "9px");
+            label.setAttribute("font-family", "'JetBrains Mono', monospace");
+            label.textContent = `${gw}`;
+            barLegendChart.appendChild(label);
+        });
+    }
 
     function drawLegend(mode) {
         if (!legendCanvas || !legendTicksEl) return;
@@ -331,9 +396,107 @@ export function createMap(selector, config) {
             });
             if (legendCaptionEl) legendCaptionEl.textContent = "EUR / MWh";
         }
+
+        drawBarLegend(mode === "both");
     }
 
     drawLegend("price");
+
+    function drawBars() {
+        if (state.hour == null || !showcase || state.colorMode !== "both") {
+            gBars.selectAll("g.bar3d").remove();
+            return;
+        }
+
+        const barData = countries.features.map((f) => {
+            const entry = showcase.countries?.[f.id]?.[state.hour];
+            const mw = entry
+                ? (entry.solar || 0) + (entry.wind || 0) + (entry.hydro || 0)
+                : 0;
+            const [cx, cy] = centroidPx.get(f.id) || [0, 0];
+            const [nx, ny] = LABEL_NUDGE_PX[f.id] || [0, 0];
+            // Per-country offsets to clear the price label.
+            // CH is tiny — shift further right and up. AT is near the right edge.
+            const sideX = { CH: 30, AT: -55 }[f.id] ?? 44;
+            const sideY = { CH: -30 }[f.id] ?? 0;
+            return { id: f.id, mw, cx: cx + nx + sideX, cy: cy + ny + sideY };
+        });
+
+        const barGroups = gBars
+            .selectAll("g.bar3d")
+            .data(barData, (d) => d.id)
+            .join("g")
+            .attr("class", "bar3d")
+            .attr("pointer-events", "none");
+
+        barGroups.selectAll("*").remove();
+
+        barGroups.each(function (d) {
+            // sqrt scale keeps small countries (CH ~3 GW) visible next to DE (~40 GW).
+            const h = Math.sqrt(d.mw / BAR_MAX_MW) * BAR_MAX_H;
+            if (h < 4) return;
+
+            const baseColor = renewableAmountColor(d.mw);
+            const col = d3.color(baseColor) || d3.color("#10b981");
+            const sideCol = col.darker(0.9);
+            const topCol = col.brighter(0.5);
+
+            const x0 = d.cx - BAR_W / 2;
+            const x1 = d.cx + BAR_W / 2;
+            const yBot = d.cy + 10;   // base aligns with price-label row
+            const yTop = yBot - h;
+
+            // Front face
+            const front = [
+                [x0, yBot], [x0, yTop], [x1, yTop], [x1, yBot],
+            ];
+            // Top face (parallelogram)
+            const top = [
+                [x0, yTop], [x0 + BAR_DX, yTop + BAR_DY],
+                [x1 + BAR_DX, yTop + BAR_DY], [x1, yTop],
+            ];
+            // Right side face
+            const side = [
+                [x1, yTop], [x1 + BAR_DX, yTop + BAR_DY],
+                [x1 + BAR_DX, yBot + BAR_DY], [x1, yBot],
+            ];
+
+            const pts = (poly) => poly.map((p) => p.join(",")).join(" ");
+
+            const g = d3.select(this);
+            g.append("polygon")
+                .attr("points", pts(side))
+                .attr("fill", sideCol.toString())
+                .attr("stroke", "none");
+            g.append("polygon")
+                .attr("points", pts(front))
+                .attr("fill", col.toString())
+                .attr("stroke", "none");
+            g.append("polygon")
+                .attr("points", pts(top))
+                .attr("fill", topCol.toString())
+                .attr("stroke", "none");
+
+            // GW label centred above the top face.
+            const labelX = d.cx + BAR_DX / 2;
+            const labelY = yTop + BAR_DY - 5;
+            const gw = (d.mw / 1000).toFixed(0);
+            g.append("text")
+                .attr("x", labelX)
+                .attr("y", labelY)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#e2e8f0")
+                .attr("font-size", "12px")
+                .attr("font-family", "'JetBrains Mono', monospace")
+                .attr("font-weight", "600")
+                .attr("paint-order", "stroke")
+                .attr("stroke", "rgba(10,14,26,0.88)")
+                .attr("stroke-width", "4")
+                .attr("stroke-linejoin", "round")
+                .attr("pointer-events", "none")
+                .text(`${gw} GW`);
+        });
+    }
 
     const labelGroups = gLabels
         .selectAll("g.label")
@@ -464,7 +627,7 @@ export function createMap(selector, config) {
             }),
         );
 
-        if (state.hour != null) drawFlows();
+        if (state.hour != null) { drawFlows(); drawBars(); }
     }
 
     // Declared BEFORE the first resize() — resize() reads state.hour.
@@ -714,6 +877,7 @@ export function createMap(selector, config) {
         const isVisible = state.hour != null && !!showcase;
         if (legendEl) legendEl.classList.toggle("is-visible", isVisible);
         if (arrowLegendEl) arrowLegendEl.classList.toggle("is-visible", isVisible);
+        if (barLegendEl) barLegendEl.classList.toggle("is-visible", isVisible && state.colorMode === "both");
 
         if ("colorMode" in next && next.colorMode !== prevMode) {
             drawLegend(state.colorMode);
@@ -774,6 +938,7 @@ export function createMap(selector, config) {
         });
 
         drawFlows();
+        drawBars();
     }
 
     // narrative.js uses this to draw leader lines from cards to a country.
