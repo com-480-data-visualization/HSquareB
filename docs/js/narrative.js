@@ -59,14 +59,27 @@ export function initNarrative(selector, config) {
     // Step 4 heatmap loads lazily — data may arrive post-init via injectCalendarHeatmap.
     const heatmapContainer = container.querySelector('[data-step-chart="heatmap"]');
     function injectCalendarHeatmap(calendarData) {
-        if (!heatmapContainer || !calendarData?.days?.length) return;
-        createCalendarHeatmap(heatmapContainer, {
-            data: calendarData,
-            countries: [
-                { code: "DE", label: "Germany — 846 negative hours" },
-                { code: "CH", label: "Switzerland — 529 negative hours" },
-            ],
-        });
+        console.info("injectCalendarHeatmap called — days:", calendarData?.days?.length ?? 0);
+        if (!heatmapContainer) {
+            console.warn("injectCalendarHeatmap: no heatmap container found");
+            return;
+        }
+        if (!calendarData?.days?.length) {
+            console.warn("injectCalendarHeatmap: calendarData missing or empty");
+            return;
+        }
+        try {
+            createCalendarHeatmap(heatmapContainer, {
+                data: calendarData,
+                countries: [
+                    { code: "DE", label: "Germany — 846 negative hours" },
+                    { code: "CH", label: "Switzerland — 529 negative hours" },
+                ],
+            });
+            console.info("createCalendarHeatmap invoked");
+        } catch (err) {
+            console.error("createCalendarHeatmap error:", err);
+        }
     }
     if (config.calendarData) {
         injectCalendarHeatmap(config.calendarData);
