@@ -1064,7 +1064,8 @@ body.is-iris-firing .scene__map::before {
     flex-direction: column;
     gap: 4px;
     opacity: 0;
-    transition: opacity var(--dur-default) var(--ease-default);
+    transition: opacity var(--dur-default) var(--ease-default),
+                bottom var(--dur-medium) var(--ease-default);
     pointer-events: none;
 }
 
@@ -1082,18 +1083,20 @@ body.is-iris-firing .scene__map::before {
 .map-legend__ticks {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.04em;
     color: var(--text-muted);
     padding: 0 1px;
 }
 
 .map-legend__caption {
-    font-size: 8px;
-    letter-spacing: 0.1em;
+    font-size: 10px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-ghost);
     margin: 0;
+    max-width: 200px;
+    line-height: 1.4;
 }
 
 /* --- Arrow legend --- */
@@ -1106,11 +1109,12 @@ body.is-iris-firing .scene__map::before {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.04em;
     color: var(--text-muted);
     opacity: 0;
-    transition: opacity var(--dur-default) var(--ease-default);
+    transition: opacity var(--dur-default) var(--ease-default),
+                bottom var(--dur-medium) var(--ease-default);
     pointer-events: none;
 }
 
@@ -1120,6 +1124,57 @@ body.is-iris-firing .scene__map::before {
 
 .arrow-legend svg {
     flex-shrink: 0;
+}
+
+/* --- Bar legend (renewable height scale, "both" mode only) --- */
+
+.bar-legend {
+    position: absolute;
+    bottom: 28px;
+    right: var(--gutter);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity var(--dur-default) var(--ease-default),
+                bottom var(--dur-medium) var(--ease-default);
+    pointer-events: none;
+}
+
+.bar-legend.is-visible {
+    opacity: 1;
+}
+
+.bar-legend__chart {
+    display: block;
+}
+
+.bar-legend__caption {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-ghost);
+    margin: 0;
+    text-align: right;
+}
+
+/* Lift all legends above the explorer timeline when it is docked.
+ * Timeline height ≈ 200px; its own bottom = clamp(24px,4vh,56px).
+ * The +210px / +258px offsets clear the full timeline box. */
+@supports selector(:has(.a)) {
+    body:has(.explorer__timeline-wrap.is-visible) .map-legend {
+        bottom: calc(clamp(24px, 4vh, 56px) + env(safe-area-inset-bottom, 0px) + 210px);
+    }
+
+    body:has(.explorer__timeline-wrap.is-visible) .arrow-legend {
+        bottom: calc(clamp(24px, 4vh, 56px) + env(safe-area-inset-bottom, 0px) + 258px);
+    }
+
+    body:has(.explorer__timeline-wrap.is-visible) .bar-legend {
+        bottom: calc(clamp(24px, 4vh, 56px) + env(safe-area-inset-bottom, 0px) + 210px);
+    }
 }
 
 /* --- Leader line (card → country) --- */
@@ -1614,7 +1669,7 @@ body.is-iris-firing .scene__map::before {
 }
 
 .step__hero-currency {
-    font-size: 0.36em;
+    font-size: 0.46em;
     font-style: normal;
     font-variation-settings: "opsz" 24, "wght" 400;
     color: color-mix(in srgb, var(--accent-glow) 60%, transparent);
@@ -1624,9 +1679,9 @@ body.is-iris-firing .scene__map::before {
 }
 
 .step__hero-sign {
-    font-size: 0.92em;
+    font-size: 3em;
     font-style: normal;
-    font-weight: 300;
+    font-weight: 400;
     color: var(--accent-glow);
     margin-right: -0.04em;
 }
@@ -1653,7 +1708,7 @@ body.is-iris-firing .scene__map::before {
 }
 
 .step__hero-unit {
-    font-size: 0.16em;
+    font-size: 0.24em;
     font-style: normal;
     font-weight: 500;
     text-transform: uppercase;
@@ -1839,6 +1894,24 @@ body.is-iris-firing .scene__map::before {
     font-weight: 600;
 }
 
+.spark__country-tag {
+    font-size: 9px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--accent) 65%, var(--text-secondary));
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+}
+
+.spark__caption {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 3px 0 0;
+}
+
 .gen-donut__label {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -1846,6 +1919,24 @@ body.is-iris-firing .scene__map::before {
     fill: var(--text-primary);
     font-variant-numeric: tabular-nums;
     font-variation-settings: normal;
+}
+
+.gen-donut__dom {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    margin: 3px 0 0;
+}
+
+.gen-donut__time {
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    text-align: center;
+    margin: 1px 0 0;
 }
 
 /* --- Calendar heatmap --- */
@@ -1993,6 +2084,14 @@ body.is-iris-firing .scene__map::before {
     letter-spacing: 0.05em;
 }
 
+.cal-heatmap__desc {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 8px 0 0;
+}
+
 /* --- Generation stack --- */
 
 .gen-stack {
@@ -2074,6 +2173,25 @@ body.is-iris-firing .scene__map::before {
     font-variation-settings: normal;
 }
 
+.gen-stack__annot-line {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.gen-stack__annot-label,
+.gen-stack__load-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    fill: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-variation-settings: normal;
+    pointer-events: none;
+}
+
 .gen-stack__crosshair {
     stroke: var(--text-muted);
     stroke-width: 1;
@@ -2138,6 +2256,16 @@ body.is-iris-firing .scene__map::before {
     stroke: color-mix(in srgb, var(--text-muted) 40%, transparent);
     stroke-width: 1;
     stroke-dasharray: 3 3;
+}
+
+.daily-profile__ghost-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    fill: color-mix(in srgb, var(--text-muted) 60%, transparent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-variation-settings: normal;
+    pointer-events: none;
 }
 
 .daily-profile__area {
@@ -2213,6 +2341,16 @@ body.is-iris-firing .scene__map::before {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px 12px;
     max-width: 500px;
+}
+
+.small-multiples__caption {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 4px 0 0;
 }
 
 @media (max-width: 900px) {

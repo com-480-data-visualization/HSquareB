@@ -72,7 +72,7 @@ export function createCalendarHeatmap(selector, config) {
         activeIdx = idx;
         tabs.forEach((t, i) => t.classList.toggle("is-active", i === idx));
         titleEl.textContent = countries[idx].label;
-        currentChart = renderChart(chartHolder, chartDataByIdx[idx], countries[idx].code);
+        currentChart = renderChart(chartHolder, chartDataByIdx[idx], countries[idx].code, CELL_W);
     }
     switchTo(0);
 
@@ -104,7 +104,7 @@ function prepareChartData(data, country) {
     return { days, months, gridH: yOffset };
 }
 
-function renderChart(holder, chartData, country) {
+function renderChart(holder, chartData, country, CELL_W) {
     const { days, months, gridH } = chartData;
     while (holder.firstChild) holder.removeChild(holder.firstChild);
 
@@ -230,6 +230,11 @@ function renderChart(holder, chartData, country) {
     });
     legendEl.appendChild(labelsRow);
     holder.appendChild(legendEl);
+
+    const descEl = document.createElement("p");
+    descEl.className = "cal-heatmap__desc mono";
+    descEl.textContent = "Rows = days \u00b7 Columns = hours (00\u201323) \u00b7 Colour = price (\u20ac/MWh)";
+    holder.appendChild(descEl);
 
     function teardown() {
         canvas.removeEventListener("pointermove", onMove);

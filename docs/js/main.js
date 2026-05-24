@@ -31,9 +31,16 @@ async function init() {
     initExplorer({ map, showcase, profilesData });
 
     loadJSON("calendar_heatmap.json").then((calendarData) => {
+        console.info("calendar_heatmap.json loaded:", calendarData && calendarData?.days ? `${calendarData.days.length} days` : calendarData ? 'no days key' : 'no payload');
         if (calendarData && narrative?.injectCalendarHeatmap) {
-            narrative.injectCalendarHeatmap(calendarData);
+            try {
+                narrative.injectCalendarHeatmap(calendarData);
+            } catch (err) {
+                console.error("injectCalendarHeatmap threw:", err);
+            }
         }
+    }).catch((err) => {
+        console.warn("Failed to load calendar_heatmap.json:", err);
     });
 
     setupHeroTitleReveal();

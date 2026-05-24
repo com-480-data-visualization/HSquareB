@@ -151,6 +151,14 @@ export function createDailyProfile(selector, config) {
             .attr("x", -margin.left + 4)
             .attr("y", -8)
             .text("€/MWh");
+
+        // Permanent label on the ghost (annual-average) line at hour 1.
+        g.append("text")
+            .attr("class", "daily-profile__ghost-label")
+            .attr("x", x(1))
+            .attr("y", y(profiles.annual_average[1]) - 5)
+            .attr("text-anchor", "start")
+            .text("Annual avg");
     } else {
         g.append("text")
             .attr("class", "daily-profile__country-label")

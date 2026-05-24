@@ -121,11 +121,16 @@
             </div>
 
             <div class="arrow-legend mono" aria-label="Flow arrow legend">
-                <svg width="32" height="10" viewBox="0 0 32 10" aria-hidden="true">
-                    <defs><marker id="arrow-legend-head" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="var(--accent)"/></marker></defs>
-                    <line x1="2" y1="5" x2="26" y2="5" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow-legend-head)"/>
+                <svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true">
+                    <line x1="1" y1="4" x2="18" y2="4" stroke="var(--accent)" stroke-width="1.2"/>
+                    <polygon points="17,1.5 23,4 17,6.5" fill="var(--accent)"/>
                 </svg>
                 <span>Electricity flows from cheap to expensive</span>
+            </div>
+
+            <div class="bar-legend" aria-label="Renewable bar height scale">
+                <svg class="bar-legend__chart" width="90" height="74" aria-hidden="true"></svg>
+                <p class="bar-legend__caption mono">GW renewable</p>
             </div>
         </aside>
 
@@ -302,6 +307,7 @@
                             <div class="timeline__mode mono" data-color-mode aria-label="Map color mode">
                                 <button type="button" class="timeline__mode-btn is-active" data-mode="price">Price</button>
                                 <button type="button" class="timeline__mode-btn" data-mode="renewable">Renewable</button>
+                                <button type="button" class="timeline__mode-btn" data-mode="both">Both</button>
                             </div>
                         </div>
 

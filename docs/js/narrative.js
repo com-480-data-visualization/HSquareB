@@ -59,14 +59,27 @@ export function initNarrative(selector, config) {
     // Step 4 heatmap loads lazily — data may arrive post-init via injectCalendarHeatmap.
     const heatmapContainer = container.querySelector('[data-step-chart="heatmap"]');
     function injectCalendarHeatmap(calendarData) {
-        if (!heatmapContainer || !calendarData?.days?.length) return;
-        createCalendarHeatmap(heatmapContainer, {
-            data: calendarData,
-            countries: [
-                { code: "DE", label: "Germany — 846 negative hours" },
-                { code: "CH", label: "Switzerland — 529 negative hours" },
-            ],
-        });
+        console.info("injectCalendarHeatmap called — days:", calendarData?.days?.length ?? 0);
+        if (!heatmapContainer) {
+            console.warn("injectCalendarHeatmap: no heatmap container found");
+            return;
+        }
+        if (!calendarData?.days?.length) {
+            console.warn("injectCalendarHeatmap: calendarData missing or empty");
+            return;
+        }
+        try {
+            createCalendarHeatmap(heatmapContainer, {
+                data: calendarData,
+                countries: [
+                    { code: "DE", label: "Germany — 846 negative hours" },
+                    { code: "CH", label: "Switzerland — 529 negative hours" },
+                ],
+            });
+            console.info("createCalendarHeatmap invoked");
+        } catch (err) {
+            console.error("createCalendarHeatmap error:", err);
+        }
     }
     if (config.calendarData) {
         injectCalendarHeatmap(config.calendarData);
@@ -124,6 +137,10 @@ export function initNarrative(selector, config) {
                 }
             }
             multiContainer.appendChild(multiWrap);
+            const multiCaption = document.createElement("p");
+            multiCaption.className = "small-multiples__caption mono";
+            multiCaption.textContent = "Annual-average 24-hour price profile · Jan 2024 – Jun 2025";
+            multiContainer.appendChild(multiCaption);
         }
     }
 
@@ -623,12 +640,15 @@ function renderStepSparkline(stepEl, showcase) {
         .attr("x", width - padding.right).attr("y", height - 2)
         .attr("text-anchor", "end")
         .text("23");
-    svg.append("text")
-        .attr("class", "spark__country")
-        .attr("x", padding.left)
-        .attr("y", padding.top + 7)
-        .attr("text-anchor", "start")
-        .text(country);
+    const countryTag = document.createElement("p");
+    countryTag.className = "spark__country-tag mono";
+    countryTag.textContent = country;
+    target.insertBefore(countryTag, svg.node());
+
+    const caption = document.createElement("p");
+    caption.className = "spark__caption mono";
+    caption.textContent = "Day-ahead price · 12 May 2024";
+    target.appendChild(caption);
 }
 
 
@@ -688,6 +708,17 @@ function renderGenDonut(stepEl, showcase, country, hour) {
         .attr("text-anchor", "middle")
         .attr("dy", "0.35em")
         .text(`${pct}%`);
+
+    const domLabel = document.createElement("p");
+    domLabel.className = "gen-donut__dom mono";
+    domLabel.textContent = dominant.label;
+    domLabel.style.color = dominant.color;
+    wrapper.appendChild(domLabel);
+
+    const timeLabel = document.createElement("p");
+    timeLabel.className = "gen-donut__time mono";
+    timeLabel.textContent = `Gen. mix · ${String(hour).padStart(2, "0")}:00`;
+    wrapper.appendChild(timeLabel);
 
     target.insertBefore(wrapper, target.firstChild);
 }
