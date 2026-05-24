@@ -2414,6 +2414,13 @@ body.is-iris-firing .scene__map::before {
     border-top: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
     display: flex;
     flex-direction: column;
+    /* Let clicks pass through transparent area to the map SVG below. */
+    pointer-events: none;
+}
+
+.explorer__sidebar,
+.explorer__timeline-wrap.is-visible {
+    pointer-events: auto;
 }
 
 .explorer__intro {

@@ -503,7 +503,8 @@ export function createMap(selector, config) {
         .data(countries.features)
         .join("g")
         .attr("class", "label")
-        .attr("data-iso", (d) => d.id);
+        .attr("data-iso", (d) => d.id)
+        .attr("pointer-events", "none");
 
     labelGroups.append("text")
         .attr("class", "label__code")
